@@ -17,3 +17,10 @@ data/
 *.mp4
 *.mov
 *.csv
+*.avi
+*.jsonl
+
+# FastAPI
+*.db
+*.sqlite
+*.log

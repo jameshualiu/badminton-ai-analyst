@@ -32,40 +32,23 @@
 //   )
 // }
 
-import { useState } from "react";
+import React from "react";
+import { UploadSection } from "./components/UploadSection";
 
-function App() {
-    const [result, setResult] = useState(null);
-
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return;
-
-        const file = e.target.files[0];
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const res = await fetch("http://localhost:8000/analyze-video", {
-            method: "POST",
-            body: formData,
-        });
-
-        const data = await res.json();
-        setResult(data);
-    };
-
+export default function App() {
     return (
-        <div style={{ padding: 50 }}>
-            <h1>Badminton AI Analyst</h1>
+        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center">
+            {/* HEADER */}
+            <header className="w-full py-6 border-b border-neutral-800">
+                <h1 className="text-center text-3xl font-bold tracking-wide">
+                    Badminton AI Analyst
+                </h1>
+            </header>
 
-            <input type="file" accept="video/*" onChange={handleUpload} />
-
-            {result && (
-                <pre style={{ marginTop: 20 }}>
-                    {JSON.stringify(result, null, 2)}
-                </pre>
-            )}
+            {/* MAIN CONTENT */}
+            <main className="w-full flex justify-center px-4">
+                <UploadSection />
+            </main>
         </div>
     );
 }
-
-export default App;

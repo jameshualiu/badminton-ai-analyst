@@ -1,0 +1,10 @@
+# requirements.txt
+fastapi
+uvicorn[standard] # The ASGI server to run FastAPI
+opencv-python-headless # OpenCV without GUI dependencies
+numpy # Required by OpenCV
+python-jose # For future JWT authentication
+pydantic # For data validation
+httpx # Asynchronous HTTP client (needed for Roboflow API)
+inference-sdk # Roboflow's easy-to-use SDK
+# Add later: ultralytics (for YOLO-Pose), psycopg2 (for Postgres)
