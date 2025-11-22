@@ -39,7 +39,7 @@ async def process_uploaded_video(video_path: str) -> Dict[str, Any]:
         # B. YOLO Pose (Sync) - Get raw list results
         pose_results_list = pose_model(frame, verbose=False)
         
-        # --- DATA PROCESSING (Fixing the error) ---
+        # --- DATA PROCESSING  ---
         
         # Extract Keypoints from the raw YOLO object into a JSON-friendly list
         pose_data = []

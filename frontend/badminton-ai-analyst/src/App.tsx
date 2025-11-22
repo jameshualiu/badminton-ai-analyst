@@ -1,54 +1,87 @@
-// import { useState } from 'react'
-// import reactLogo from './assets/react.svg'
-// import viteLogo from '/vite.svg'
-// import './App.css'
+import { useState } from "react";
+import { VideoAnalysis } from "./components/VideoAnalysis";
+import { Dashboard } from "./components/Dashboard";
+import { AIChat } from "./components/AIChat";
+import { PlayCircle, LayoutDashboard, MessageSquare } from "lucide-react";
 
-// function App() {
-//   const [count, setCount] = useState(0)
-
-//   return (
-//     <>
-//       <div>
-//         <a href="https://vite.dev" target="_blank">
-//           <img src={viteLogo} className="logo" alt="Vite logo" />
-//         </a>
-//         <a href="https://react.dev" target="_blank">
-//           <img src={reactLogo} className="logo react" alt="React logo" />
-//         </a>
-//       </div>
-//       <h1>Vite + React</h1>
-//       <div className="card">
-//         <button onClick={() => setCount((count) => count + 1)}>
-//           count is {count}
-//         </button>
-//         <p>
-//           Edit <code>src/App.tsx</code> and save to test HMR
-//         </p>
-//       </div>
-//       <p className="read-the-docs">
-//         Click on the Vite and React logos to learn more
-//       </p>
-//     </>
-//   )
-// }
-
-import React from "react";
-import { UploadSection } from "./components/UploadSection";
+type View = "dashboard" | "analysis" | "chat";
 
 export default function App() {
-    return (
-        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center">
-            {/* HEADER */}
-            <header className="w-full py-6 border-b border-neutral-800">
-                <h1 className="text-center text-3xl font-bold tracking-wide">
-                    Badminton AI Analyst
-                </h1>
-            </header>
+    const [currentView, setCurrentView] = useState<View>("dashboard");
+    const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
-            {/* MAIN CONTENT */}
-            <main className="w-full flex justify-center px-4">
-                <UploadSection />
-            </main>
+    const handleVideoSelect = (videoId: string) => {
+        setSelectedVideo(videoId);
+        setCurrentView("analysis");
+    };
+
+    return (
+        <div className="min-h-screen bg-black text-white">
+            {/* Navigation */}
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-purple-900/20">
+                <div className="max-w-7xl mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-xl tracking-tight font-[Sans Serif]">
+                            Badminton AI Analyst
+                        </h1>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setCurrentView("dashboard")}
+                                className={`px-4 py-2 rounded-full transition-all ${
+                                    currentView === "dashboard"
+                                        ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/50 hover:shadow-lg hover:shadow-purple-500/60"
+                                        : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <LayoutDashboard className="w-4 h-4" />
+                                    <span>Dashboard</span>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setCurrentView("analysis")}
+                                className={`px-4 py-2 rounded-full transition-all ${
+                                    currentView === "analysis"
+                                        ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/50 hover:shadow-lg hover:shadow-purple-500/60"
+                                        : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <PlayCircle className="w-4 h-4" />
+                                    <span>Analysis</span>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setCurrentView("chat")}
+                                className={`px-4 py-2 rounded-full transition-all ${
+                                    currentView === "chat"
+                                        ? "bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/50 hover:shadow-lg hover:shadow-purple-500/60"
+                                        : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4" />
+                                    <span>AI Agent</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            {/* Main Content */}
+            <div className="pt-20">
+                {currentView === "dashboard" && (
+                    <Dashboard onVideoSelect={handleVideoSelect} />
+                )}
+                {currentView === "analysis" && (
+                    <VideoAnalysis videoId={selectedVideo} />
+                )}
+                {currentView === "chat" && <AIChat />}
+            </div>
         </div>
     );
 }
