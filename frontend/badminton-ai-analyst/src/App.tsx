@@ -21,7 +21,7 @@ export default function App() {
             <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-purple-900/20">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-xl tracking-tight font-[Sans Serif]">
+                        <h1 className="text-xl tracking-tight font-[Poppins]">
                             Badminton AI Analyst
                         </h1>
 

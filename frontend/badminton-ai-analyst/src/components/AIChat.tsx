@@ -178,7 +178,7 @@ export function AIChat() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyPress}
                     placeholder="Ask about your performance..."
                     className="flex-1 bg-transparent px-4 py-3 outline-none text-white placeholder-gray-500"
                 />
