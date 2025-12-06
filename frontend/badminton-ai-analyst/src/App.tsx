@@ -34,7 +34,7 @@ export default function App() {
                                         : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
                                 }`}
                             >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 font-[Poppins]">
                                     <LayoutDashboard className="w-4 h-4" />
                                     <span>Dashboard</span>
                                 </div>
@@ -48,7 +48,7 @@ export default function App() {
                                         : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
                                 }`}
                             >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 font-[Poppins]">
                                     <PlayCircle className="w-4 h-4" />
                                     <span>Analysis</span>
                                 </div>
@@ -62,7 +62,7 @@ export default function App() {
                                         : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10"
                                 }`}
                             >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 font-[Poppins]">
                                     <MessageSquare className="w-4 h-4" />
                                     <span>AI Agent</span>
                                 </div>
