@@ -1,0 +1,258 @@
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, FileVideo, Film, Upload, X } from "lucide-react";
+import { Button } from "../../../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
+
+interface UploadModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+
+  onUpload: (file: File) => Promise<{ videoId: string }>;
+
+  // future-proof: sessionUrl optional later
+  onSeeAnalysis: (videoId: string, sessionUrl?: string) => void;
+}
+
+type UploadState = "idle" | "uploading" | "complete";
+
+export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: UploadModalProps) {
+  const [dragActive, setDragActive] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [uploadedVideoId, setUploadedVideoId] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => {
+        setSelectedFile(null);
+        setUploadState("idle");
+        setUploadProgress(0);
+        setUploadedVideoId("");
+      }, 300);
+    }
+  }, [open]);
+
+  const handleDrag = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.type === "dragenter" || event.type === "dragover") setDragActive(true);
+    if (event.type === "dragleave") setDragActive(false);
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    const file = event.target.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const handleFile = (file: File) => {
+    if (file.type.startsWith("video/")) setSelectedFile(file);
+  };
+
+  const handleUploadClick = async () => {
+    if (!selectedFile) return;
+
+    setUploadState("uploading");
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => (prev < 90 ? prev + 5 : prev));
+    }, 200);
+
+    try {
+      const { videoId } = await onUpload(selectedFile);
+      setUploadedVideoId(videoId);
+      setUploadProgress(100);
+      setUploadState("complete");
+    } finally {
+      clearInterval(interval);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl bg-card/40 border border-border/50 backdrop-blur-sm text-foreground shadow-2xl shadow-primary/10 p-0 overflow-hidden gap-0">
+        <DialogHeader className="p-6 border-b border-border/40 bg-background/20">
+          <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
+            <Film className="w-5 h-5 text-primary" />
+            Upload Match Footage
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="p-6">
+          {uploadState === "idle" &&
+            (!selectedFile ? (
+              <div
+                className={`group relative flex flex-col items-center justify-center w-full h-80 border-2 border-dashed rounded-2xl transition-all duration-300 ease-out cursor-pointer ${
+                  dragActive
+                    ? "border-primary bg-primary/10 scale-[1.01]"
+                    : "border-border/40 hover:border-primary/40 hover:bg-background/30"
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => inputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  className="hidden"
+                  accept="video/*"
+                  onChange={handleChange}
+                />
+
+                <div className="flex flex-col items-center gap-4 p-6 text-center z-10">
+                  <div
+                    className={`p-5 rounded-full transition-all duration-300 ${
+                      dragActive ? "bg-primary/20" : "bg-card/30 group-hover:bg-primary/10"
+                    }`}
+                  >
+                    <Upload
+                      className={`w-10 h-10 transition-colors ${
+                        dragActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xl font-medium text-foreground/90">Drag and drop your video</p>
+                    <p className="text-sm text-muted-foreground">
+                      or{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          inputRef.current?.click();
+                        }}
+                        className="text-primary hover:opacity-80 hover:underline font-medium cursor-pointer"
+                      >
+                        browse files
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full py-4 space-y-6">
+                <div className="relative overflow-hidden flex items-center gap-4 p-5 bg-background/30 rounded-2xl border border-border/40">
+                  <div className="p-4 bg-primary/15 rounded-xl border border-primary/20">
+                    <FileVideo className="w-8 h-8 text-primary" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-lg text-foreground/90 truncate mb-1">
+                      {selectedFile.name}
+                    </p>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span>{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                      <span className="text-primary/80">Ready to upload</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedFile(null)}
+                    className="p-2 hover:bg-card/30 rounded-full text-muted-foreground hover:text-foreground transition cursor-pointer"
+                    aria-label="Remove file"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => onOpenChange(false)}
+                    className="px-6 py-6 rounded-xl text-muted-foreground"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUploadClick}
+                    className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                  >
+                    Upload Analysis
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+          {uploadState === "uploading" && (
+            <div className="w-full py-4 space-y-6">
+              <div className="relative overflow-hidden flex items-center gap-4 p-5 bg-background/30 rounded-2xl border border-border/40">
+                <div className="p-4 bg-primary/15 rounded-xl border border-primary/20">
+                  <FileVideo className="w-8 h-8 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-lg text-foreground/90 truncate mb-1">
+                    {selectedFile?.name}
+                  </p>
+                  <p className="text-sm text-primary/80">Uploading...</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Upload Progress</span>
+                  <span className="text-primary font-medium">{uploadProgress}%</span>
+                </div>
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-card/25">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {uploadState === "complete" && (
+            <div className="w-full py-4 space-y-6">
+              <div className="relative overflow-hidden flex items-center gap-4 p-5 bg-background/30 rounded-2xl border border-border/40">
+                <div className="p-4 bg-primary/15 rounded-xl border border-primary/20">
+                  <CheckCircle2 className="w-8 h-8 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-lg text-foreground/90 truncate mb-1">
+                    Finished uploading
+                  </p>
+                  <p className="text-sm text-muted-foreground">Ready to view</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                  className="px-6 py-6 rounded-xl text-muted-foreground"
+                >
+                  Close
+                </Button>
+                <Button
+                  className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                  onClick={() => {
+                    onSeeAnalysis(uploadedVideoId);
+                    onOpenChange(false);
+                  }}
+                >
+                  See Analysis
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
