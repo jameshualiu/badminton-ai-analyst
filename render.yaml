@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: badminton-ai-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /api/health/firestore
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: E2_ACCESS_KEY_ID
+        sync: false
+      - key: E2_SECRET_ACCESS_KEY
+        sync: false
+      - key: E2_ENDPOINT
+        sync: false
+      - key: E2_BUCKET_NAME
+        sync: false
