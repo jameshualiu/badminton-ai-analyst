@@ -5,8 +5,12 @@ build/
 .env
 .env.local
 
+# AI Instructions
+GEMINI.md
+
 # OS
 .DS_Store
+
 Thumbs.db
 
 # Test Videos

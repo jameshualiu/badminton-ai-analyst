@@ -1,0 +1,28 @@
+# Development Dockerfile for React/Vite
+FROM node:20-alpine
+
+# Install 'shadow' to manage users if needed (Alpine specific)
+RUN apk add --no-cache shadow
+
+WORKDIR /app
+
+# Install dependencies first.
+COPY package*.json ./
+
+# Fix permissions for the node_modules folder BEFORE installing.
+# This ensures the 'node' user can write to .vite and other folders.
+RUN mkdir -p /app/node_modules && chown -R node:node /app
+
+RUN npm install
+
+# Copy source code.
+COPY . .
+
+# Ensure the 'node' user owns everything in the app folder.
+RUN chown -R node:node /app
+
+USER node
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host"]

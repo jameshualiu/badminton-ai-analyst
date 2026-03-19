@@ -42,8 +42,6 @@ export default function AnalysisPage() {
 
   // These are the secure, signed URLs we get from the backend
   const [urls, setUrls] = useState<Partial<Record<string, string>>>({});
-  const [urlsLoading, setUrlsLoading] = useState(false);
-  const [urlsError, setUrlsError] = useState<string | null>(null);
 
   // 1. Real-time Status Subscription (Firestore)
   // This is fine to keep on frontend for "Read-Only" status updates
@@ -88,15 +86,14 @@ export default function AnalysisPage() {
     let cancelled = false;
 
     async function fetchSignedUrls() {
-      setUrlsLoading(true);
       try {
         // A. Get the secure token
         const token = await user?.getIdToken();
-        
+
         // B. Call backend
         const res = await fetch(`${API_BASE}/videos/${videoId}/results`, {
           headers: {
-             "Authorization": `Bearer ${token}` 
+             "Authorization": `Bearer ${token}`
           }
         });
 
@@ -107,12 +104,9 @@ export default function AnalysisPage() {
           setUrls(data.urls);
         }
       } catch (e: any) {
-        if (!cancelled) setUrlsError(e.message);
-      } finally {
-        if (!cancelled) setUrlsLoading(false);
+        console.error("Failed to fetch signed URLs:", e);
       }
     }
-
     fetchSignedUrls();
     return () => { cancelled = true; };
   }, [user, videoId, status]); // Re-run if status changes to "done"
