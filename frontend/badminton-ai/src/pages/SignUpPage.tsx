@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowLeft, Chrome, Lock, Mail, Sparkles, User } from "lucide-react";
 import { signInWithGoogle, signUpWithEmail } from "../auth/authActions";
+import { useAuthUser } from "../auth/hooks/useAuthUser";
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuthUser();
 
   const [name, setName] = useState(""); // optional for now
   const [email, setEmail] = useState("");
@@ -14,6 +16,20 @@ export default function SignUpPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
