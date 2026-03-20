@@ -19,6 +19,8 @@ services:
         sync: false
       - key: E2_SECRET_ACCESS_KEY
         sync: false
+      - key: E2_REGION
+        sync: false
       - key: E2_ENDPOINT
         sync: false
       - key: E2_BUCKET_NAME
