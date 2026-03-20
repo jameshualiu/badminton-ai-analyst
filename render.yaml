@@ -3,7 +3,7 @@ services:
     name: badminton-ai-backend
     env: docker
     dockerContext: backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: backend/Dockerfile
     plan: free
     healthCheckPath: /api/health/firestore
     envVars:
