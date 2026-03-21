@@ -1,0 +1,11 @@
+decord
+ultralytics==8.3.70
+onnxruntime-gpu
+opencv-python-headless
+boto3
+google-cloud-firestore
+python-dotenv
+tensorflow-cpu
+tf2onnx
+onnx
+firebase-admin
