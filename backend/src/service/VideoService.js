@@ -1,5 +1,5 @@
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-const { PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { v4: uuidv4 } = require('uuid');
 const e2Client = require('../config/e2'); // Your E2 client configuration
 
@@ -51,7 +51,7 @@ class VideoService {
       throw new Error("Video not found");
     }
 
-    const { status, artifacts, input } = videoData;
+    const { status, input, analysisJson } = videoData;
     const urls = {};
 
     // 2. Helper function to generate a read-only URL
@@ -61,26 +61,61 @@ class VideoService {
         Bucket: process.env.E2_BUCKET_NAME,
         Key: key,
       });
-      // URL expires in 1 hour
       return await getSignedUrl(e2Client, command, { expiresIn: 3600 });
     };
 
-    // 3. Generate URLs for the original video (so the user can replay it)
+    // 3. Generate URL for original video
     if (input && input.e2Key) {
       urls.originalVideo = await generateGetUrl(input.e2Key);
     }
 
-    // 4. Generate URLs for any AI artifacts that exist
-    if (artifacts) {
-      // Loop through all possible artifacts (heatmap, annotatedVideo, summary, etc.)
-      for (const [artifactName, artifactKey] of Object.entries(artifacts)) {
-        if (artifactKey) {
-          urls[artifactName] = await generateGetUrl(artifactKey);
-        }
-      }
+    // 4. Generate URL for analysis telemetry
+    if (analysisJson) {
+      urls.analysisJson = await generateGetUrl(analysisJson);
     }
 
     return { status, urls };
+  }
+
+  async deleteVideo(userId, videoId) {
+    const videoData = await this.repo.getVideo(userId, videoId);
+    if (!videoData) {
+      throw new Error("Video not found");
+    }
+
+    // 1. Cleanup E2 Artifacts
+    // We want to delete everything under uploads/{userId}/{videoId}/ 
+    // and outputs/{userId}/{videoId}/
+    const prefixes = [
+      `uploads/${userId}/${videoId}/`,
+      `outputs/${userId}/${videoId}/`
+    ];
+
+    for (const prefix of prefixes) {
+      try {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: process.env.E2_BUCKET_NAME,
+          Prefix: prefix,
+        });
+        const listResponse = await e2Client.send(listCommand);
+
+        if (listResponse.Contents && listResponse.Contents.length > 0) {
+          const deleteCommand = new DeleteObjectsCommand({
+            Bucket: process.env.E2_BUCKET_NAME,
+            Delete: {
+              Objects: listResponse.Contents.map(obj => ({ Key: obj.Key })),
+            },
+          });
+          await e2Client.send(deleteCommand);
+        }
+      } catch (err) {
+        console.error(`Failed to delete E2 objects for prefix ${prefix}:`, err);
+        // We continue to delete the DB record even if S3 fails
+      }
+    }
+
+    // 2. Delete Firestore record
+    await this.repo.deleteVideo(userId, videoId);
   }
 }
 

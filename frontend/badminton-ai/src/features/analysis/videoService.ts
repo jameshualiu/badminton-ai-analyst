@@ -84,3 +84,10 @@ export async function getVideoResults(videoId: string, token: string) {
     urls: Partial<Record<string, string>>;
   }>(`/videos/${videoId}/results`, token, { method: "GET" });
 }
+
+/**
+ * Delete a video and its artifacts.
+ */
+export async function deleteVideo(videoId: string, token: string) {
+  return api<{ success: boolean }>(`/videos/${videoId}`, token, { method: "DELETE" });
+}

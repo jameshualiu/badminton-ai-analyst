@@ -6,7 +6,7 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 import { UploadModal } from "../features/analysis/components/UploadModal";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
-import { createAndUploadVideo } from "../features/analysis/videoService";
+import { createAndUploadVideo, deleteVideo } from "../features/analysis/videoService";
 import { db } from "../lib/firebase";
 
 // ✅ adjust this import to where your VideoCard file actually lives
@@ -50,8 +50,8 @@ export default function DashboardPage() {
       title: v.title ?? "Untitled",
       date: v.createdAt?.toDate ? v.createdAt.toDate().toISOString() : new Date().toISOString(),
       thumbnail: null, // no storage yet
-      duration: v.summary?.durationSec ?? null,
-      totalShots: v.summary?.totalShots ?? 0,
+      duration: v.duration ?? null,
+      totalShots: v.totalShots ?? 0,
       status: v.status ?? "queued",
     }));
   }, [docs]);
@@ -65,6 +65,20 @@ export default function DashboardPage() {
 
   const handleSeeAnalysis = (videoId: string) => {
     navigate(`/analysis/${videoId}`);
+  };
+
+  const handleDelete = async (videoId: string) => {
+    if (!user) return;
+    if (!window.confirm("Are you sure you want to delete this analysis? This cannot be undone.")) return;
+
+    try {
+      const token = await user.getIdToken();
+      await deleteVideo(videoId, token);
+      // No need to manually refresh, onSnapshot handles it!
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete video. Please try again.");
+    }
   };
 
   return (
@@ -111,6 +125,7 @@ export default function DashboardPage() {
                     key={c.id}
                     video={c}
                     onClick={() => handleSeeAnalysis(c.id)}
+                    onDelete={() => handleDelete(c.id)}
                   />
                 ))}
               </div>

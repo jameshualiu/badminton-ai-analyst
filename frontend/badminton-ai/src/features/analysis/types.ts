@@ -10,3 +10,25 @@ export interface DashboardVideoCard {
   totalShots?: number | null;
   status?: VideoStatus;
 }
+
+export interface AnalysisShot {
+  frame: number;
+  location_px: [number, number] | null;
+  location_m: [number, number] | null;
+  type: string;
+}
+
+export interface AnalysisData {
+  summary: {
+    durationSec: number;
+    totalShots: number;
+    shotCounts: Record<string, number>;
+    resolution: [number, number];
+  };
+  geometry: {
+    court: [number, number][] | null;
+    net: [number, number][] | null;
+  } | null;
+  events: AnalysisShot[];
+  tracking: unknown[];
+}

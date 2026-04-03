@@ -33,6 +33,7 @@ apiRouter.get("/health/firestore", async (_req, res) => {
 });
 
 apiRouter.get( "/videos/:videoId/results",  authMiddleware,  videoController.getResults);
+apiRouter.delete("/videos/:videoId", authMiddleware, videoController.deleteVideo);
 
 // Specific stricter limit for video uploads (Expensive operations)
 apiRouter.post("/videos/init", authMiddleware, uploadLimiter, videoController.initUpload);

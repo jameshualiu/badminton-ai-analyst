@@ -51,6 +51,11 @@ class VideoRepository {
     
     return snapshot.data();
   }
+
+  async deleteVideo(userId, videoId) {
+    const videoRef = this.db.collection('users').doc(userId).collection('videos').doc(videoId);
+    await videoRef.delete();
+  }
 }
 
 module.exports = VideoRepository;

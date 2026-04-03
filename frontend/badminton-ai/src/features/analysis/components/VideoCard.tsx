@@ -1,14 +1,15 @@
 import { motion } from "motion/react";
-import { Clock, Target } from "lucide-react";
+import { Clock, Target, Trash2 } from "lucide-react";
 import { formatDuration } from "../../../utils/format";
 import type { DashboardVideoCard } from "../types";
 
 interface VideoCardProps {
   video: DashboardVideoCard;
   onClick: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }
 
-export function VideoCard({ video, onClick }: VideoCardProps) {
+export function VideoCard({ video, onClick, onDelete }: VideoCardProps) {
   const dateLabel = new Date(video.date).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -65,6 +66,20 @@ export function VideoCard({ video, onClick }: VideoCardProps) {
           )}
         </div>
       </div>
+
+      {/* Delete Button Overlay */}
+      {onDelete && (
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
+          className="absolute top-2 right-2 p-2 rounded-full bg-black/40 text-white/60 hover:bg-red-500/80 hover:text-white transition-all opacity-0 group-hover:opacity-100 z-10 cursor-pointer"
+          title="Delete Video"
+        >
+          <Trash2 className="w-4 h-4" />
+        </div>
+      )}
 
       <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-all pointer-events-none" />
     </motion.button>

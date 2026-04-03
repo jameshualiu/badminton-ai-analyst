@@ -24,17 +24,21 @@ MODELS_DIR = Path("/models")
     volumes={MODELS_DIR: models_volume},
     secrets=[modal.Secret.from_name("badminton-ai-secrets")],
     gpu="T4",
-    timeout=1200 # Increased to 20 minutes
+    timeout=1200
 )
-def process_badminton_video(video_id: str, user_id: str, video_e2_key: str):
+@modal.fastapi_endpoint(method="POST")
+def process_badminton_video(data: dict):
     """
-    Worker entrypoint: Downloads video, runs pipeline, and updates results.
+    Webhook entrypoint: Receives video details and starts analysis.
     """
+    video_id = data["videoId"]
+    user_id = data["userId"]
+    video_e2_key = data["videoE2Key"]
+    
     import boto3
     import firebase_admin
     from firebase_admin import credentials, firestore
     
-    # These should now be importable because of add_local_python_source
     from inference import BadmintonInference
     from pipeline import BadmintonPipeline
 
@@ -92,15 +96,13 @@ def process_badminton_video(video_id: str, user_id: str, video_e2_key: str):
         results_e2_key = f"outputs/{user_id}/{video_id}/analysis.json"
         s3.upload_file(results_local, bucket, results_e2_key)
         
-        # Step 6: Finalize Database Record
+        # Step 6: Finalize Database Record (Lean Schema)
         video_doc_ref.update({
             "status": "done",
-            "summary.totalShots": results["summary"]["totalShots"],
-            "summary.durationSec": results["summary"]["durationSec"],
-            "summary.shotCounts": results["summary"]["shotCounts"],
-            "artifacts.analysisJson": results_e2_key,
-            "progress.stage": "COMPLETE",
-            "progress.pct": 100
+            "duration": results["summary"]["durationSec"],
+            "totalShots": results["summary"]["totalShots"],
+            "analysisJson": results_e2_key, 
+            "updatedAt": firestore.SERVER_TIMESTAMP
         })
         print(f"🎉 Processing Complete for {video_id}!")
         

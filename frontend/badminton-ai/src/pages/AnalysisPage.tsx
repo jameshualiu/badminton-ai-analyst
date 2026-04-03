@@ -2,32 +2,23 @@
 import { doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { db } from "../lib/firebase"; // Still needed for READ-ONLY status updates
-import { useAuthUser } from "../auth/hooks/useAuthUser"; // Your auth hook
+import { db } from "../lib/firebase"; 
+import { useAuthUser } from "../auth/hooks/useAuthUser"; 
+import { ShotHeatmap } from "../features/analysis/components/ShotHeatmap";
+import type { AnalysisData } from "../features/analysis/types";
 
 type VideoStatus = "uploading" | "queued" | "running" | "done" | "failed";
 
-// Matches your Firestore structure
+// Matches your new Lean Firestore structure
 type FirestoreVideoDoc = {
   title?: string;
   status?: VideoStatus;
   progress?: { stage?: string; pct?: number };
   error?: string | null;
-  
-  // "artifacts" in DB just stores the R2 keys (e.g. "analyses/xyz/heatmap.png")
-  // We need the API to turn these into signed URLs.
-  artifacts?: {
-    heatmapImage?: string | null;
-    summary?: string | null;
-    annotatedVideo?: string | null;
-  };
-
-  summary?: {
-    durationSec?: number | null;
-    totalShots?: number | null;
-    shotCounts?: Record<string, number>;
-    trackingQuality?: { ballVisiblePct?: number | null };
-  };
+  duration?: number | null;
+  totalShots?: number | null;
+  analysisJson?: string | null;
+  updatedAt?: any;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
@@ -42,6 +33,7 @@ export default function AnalysisPage() {
 
   // These are the secure, signed URLs we get from the backend
   const [urls, setUrls] = useState<Partial<Record<string, string>>>({});
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
 
   // 1. Real-time Status Subscription (Firestore)
   // This is fine to keep on frontend for "Read-Only" status updates
@@ -102,8 +94,16 @@ export default function AnalysisPage() {
         const data = await res.json();
         if (!cancelled && data.urls) {
           setUrls(data.urls);
+          
+          // Fetch the actual JSON telemetry if available
+          if (data.urls.analysisJson) {
+              fetch(data.urls.analysisJson)
+                  .then(r => r.json())
+                  .then(json => setAnalysisData(json))
+                  .catch(e => console.error("Failed to fetch analysis JSON:", e));
+          }
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Failed to fetch signed URLs:", e);
       }
     }
@@ -154,14 +154,14 @@ export default function AnalysisPage() {
               </div>
 
               {/* Heatmap */}
-              <div className="bg-card/30 border border-white/10 rounded-xl p-4">
-                <h3 className="text-lg font-semibold mb-4">Shot Heatmap</h3>
-                {urls.heatmapImage ? (
-                  <img src={urls.heatmapImage} alt="Heatmap" className="w-full rounded-lg" />
+              <div className="h-[500px]">
+                {analysisData ? (
+                  <ShotHeatmap shots={analysisData.events} />
                 ) : (
-                   <div className="h-40 flex items-center justify-center text-muted-foreground bg-black/20 rounded-lg">
-                     {status === 'done' ? 'No heatmap generated' : 'Processing...'}
-                   </div>
+                  <div className="h-full bg-card/30 border border-white/10 rounded-xl p-4 flex flex-col items-center justify-center text-muted-foreground">
+                    <h3 className="text-lg font-semibold mb-4 text-center">Shot Heatmap</h3>
+                    {status === 'done' ? 'No heatmap data available.' : 'Processing...'}
+                  </div>
                 )}
               </div>
             </div>
@@ -173,17 +173,17 @@ export default function AnalysisPage() {
               <div className="bg-card/30 border border-white/10 rounded-xl p-6">
                 <h3 className="text-lg font-semibold mb-4">Match Stats</h3>
                 <div className="space-y-3">
-                   <StatRow label="Duration" value={docData.summary?.durationSec ? `${Math.round(docData.summary.durationSec)}s` : "-"} />
-                   <StatRow label="Total Shots" value={docData.summary?.totalShots || "-"} />
-                   <StatRow label="Tracking Quality" value={docData.summary?.trackingQuality?.ballVisiblePct ? `${Math.round(docData.summary.trackingQuality.ballVisiblePct * 100)}%` : "-"} />
+                   <StatRow label="Duration" value={docData.duration ? `${Math.round(docData.duration)}s` : "-"} />
+                   <StatRow label="Total Shots" value={docData.totalShots || "-"} />
+                   <StatRow label="Processing" value={status === 'done' ? "Complete" : "In Progress"} />
                 </div>
               </div>
 
               {/* JSON Summary Block */}
-              {urls.summary && (
+              {urls.analysisJson && (
                 <div className="bg-card/30 border border-white/10 rounded-xl p-6">
                   <h3 className="text-lg font-semibold mb-4">AI Insight</h3>
-                  <SummaryBlock url={urls.summary} />
+                  <SummaryBlock url={urls.analysisJson} />
                 </div>
               )}
 
@@ -213,11 +213,21 @@ function SummaryBlock({ url }: { url: string }) {
     fetch(url)
       .then(res => res.json())
       .then(data => {
-        // Handle different JSON formats gracefully
-        const text = Array.isArray(data.bullets) ? data.bullets.join("\n• ") : 
-                     data.text ? data.text : 
-                     JSON.stringify(data, null, 2);
-        setContent(Array.isArray(data.bullets) ? "• " + text : text);
+        // Parse the lean analysis.json summary
+        if (data.summary) {
+            const s = data.summary;
+            let text = `Match Duration: ${Math.round(s.durationSec)}s\n`;
+            text += `Total Shots: ${s.totalShots}\n\n`;
+            text += `Shot Breakdown:\n`;
+            if (s.shotCounts) {
+                Object.entries(s.shotCounts).forEach(([type, count]) => {
+                    text += `• ${type}: ${count}\n`;
+                });
+            }
+            setContent(text);
+        } else {
+            setContent(JSON.stringify(data, null, 2));
+        }
       })
       .catch(() => setContent("Could not load summary."));
   }, [url]);

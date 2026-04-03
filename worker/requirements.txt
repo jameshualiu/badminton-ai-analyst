@@ -9,3 +9,4 @@ tensorflow-cpu
 tf2onnx
 onnx
 firebase-admin
+fastapi
