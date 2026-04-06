@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export type VideoStatus =
     | "local"
     | "uploaded"
@@ -8,7 +10,7 @@ export type VideoStatus =
 export interface DashboardVideoCard {
     id: string;
     title: string;
-    createdAt?: any; // Firestore Timestamp
+    createdAt?: Timestamp;
     date: string; // ISO string for convenience
     thumbnail?: string | null; // optional for now
     duration?: number | null; // seconds

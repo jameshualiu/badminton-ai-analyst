@@ -1,5 +1,5 @@
 // src/pages/AnalysisPage.tsx
-import { doc, onSnapshot } from "firebase/firestore";
+import { Timestamp, doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../lib/firebase"; 
@@ -18,7 +18,7 @@ type FirestoreVideoDoc = {
   duration?: number | null;
   totalShots?: number | null;
   analysisJson?: string | null;
-  updatedAt?: any;
+  updatedAt?: Timestamp;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";

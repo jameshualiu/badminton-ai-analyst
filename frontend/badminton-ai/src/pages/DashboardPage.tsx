@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Plus } from "lucide-react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { Timestamp, collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 import { UploadModal } from "../features/analysis/components/UploadModal";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
@@ -12,12 +12,21 @@ import { db } from "../lib/firebase";
 // ✅ adjust this import to where your VideoCard file actually lives
 import { VideoCard } from "../features/analysis/components/VideoCard";
 
+type RawVideoDoc = {
+  id: string;
+  title?: string;
+  createdAt?: Timestamp;
+  duration?: number | null;
+  totalShots?: number | null;
+  status?: string;
+};
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [uploadOpen, setUploadOpen] = useState(false);
   const { user } = useAuthUser();
 
-  const [docs, setDocs] = useState<any[]>([]);
+  const [docs, setDocs] = useState<RawVideoDoc[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Listen to videos collection for this user
@@ -32,7 +41,7 @@ export default function DashboardPage() {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() })) as RawVideoDoc[]);
         setLoading(false);
       },
       (err) => {

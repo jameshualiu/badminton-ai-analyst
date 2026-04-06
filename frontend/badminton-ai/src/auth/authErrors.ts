@@ -17,8 +17,22 @@ export type AuthError = {
   rawCode?: string; // original firebase code if you want
 };
 
+function getCode(e: unknown): string | undefined {
+  if (typeof e === "object" && e !== null && "code" in e && typeof (e as Record<string, unknown>).code === "string") {
+    return (e as Record<string, unknown>).code as string;
+  }
+  return undefined;
+}
+
+function getMessage(e: unknown): string | undefined {
+  if (typeof e === "object" && e !== null && "message" in e && typeof (e as Record<string, unknown>).message === "string") {
+    return (e as Record<string, unknown>).message as string;
+  }
+  return undefined;
+}
+
 export function mapFirebaseAuthError(e: unknown): AuthError {
-  const rawCode = (e as any)?.code as string | undefined;
+  const rawCode = getCode(e);
 
   const codePart = rawCode?.startsWith("auth/") ? rawCode.slice(5) : undefined;
 
@@ -46,7 +60,7 @@ export function mapFirebaseAuthError(e: unknown): AuthError {
     default:
       return {
         code: "unknown",
-        message: (e as any)?.message ?? "Something went wrong. Please try again.",
+        message: getMessage(e) ?? "Something went wrong. Please try again.",
         rawCode,
       };
   }
