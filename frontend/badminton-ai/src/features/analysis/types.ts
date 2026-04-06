@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase/firestore";
-export type { VideoStatus } from "./videoService";
+import type { VideoStatus } from "./videoService";
+export type { VideoStatus };
 
 export interface DashboardVideoCard {
     id: string;
