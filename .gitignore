@@ -4,6 +4,19 @@ dist/
 build/
 .env
 .env.local
+.env.*
+
+# Secrets & credentials
+serviceAccount.json
+service-account.json
+service_account.json
+*-serviceaccount.json
+*serviceAccount*.json
+credentials.json
+firebase-adminsdk*.json
+*.pem
+*.p12
+*.key
 
 # AI Instructions
 GEMINI.md
