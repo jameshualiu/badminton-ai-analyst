@@ -11,6 +11,7 @@ import { db } from "../lib/firebase";
 
 // ✅ adjust this import to where your VideoCard file actually lives
 import { VideoCard } from "../features/analysis/components/VideoCard";
+import type { VideoStatus } from "../features/analysis/types";
 
 type RawVideoDoc = {
   id: string;
@@ -18,7 +19,7 @@ type RawVideoDoc = {
   createdAt?: Timestamp;
   duration?: number | null;
   totalShots?: number | null;
-  status?: string;
+  status?: VideoStatus;
 };
 
 export default function DashboardPage() {
@@ -61,7 +62,7 @@ export default function DashboardPage() {
       thumbnail: null, // no storage yet
       duration: v.duration ?? null,
       totalShots: v.totalShots ?? 0,
-      status: v.status ?? "queued",
+      status: (v.status ?? "queued") as VideoStatus,
     }));
   }, [docs]);
 

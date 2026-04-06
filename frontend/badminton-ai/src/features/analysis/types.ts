@@ -1,11 +1,5 @@
 import { Timestamp } from "firebase/firestore";
-
-export type VideoStatus =
-    | "local"
-    | "uploaded"
-    | "processing"
-    | "complete"
-    | "failed";
+export type { VideoStatus } from "./videoService";
 
 export interface DashboardVideoCard {
     id: string;

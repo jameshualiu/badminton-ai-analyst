@@ -1,6 +1,7 @@
 import { Timestamp, collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "../../../lib/firebase";
+import type { VideoStatus } from "../types";
 
 type VideoDoc = {
   id: string;
@@ -8,7 +9,7 @@ type VideoDoc = {
   createdAt?: Timestamp;
   duration?: number | null;
   totalShots?: number | null;
-  status?: string;
+  status?: VideoStatus;
 };
 
 export function useUserVideos(uid?: string) {
