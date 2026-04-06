@@ -7,8 +7,23 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export type VideoStatus = "uploading" | "queued" | "running" | "done" | "failed";
 
-/** * Helper for calling your Express backend.
- * Now requires a 'token' to identify the user securely.
+export type Result<T, E = ApiError> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+export class ApiError extends Error {
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = "ApiError";
+    this.statusCode = statusCode;
+  }
+}
+
+/**
+ * Helper for calling your Express backend.
+ * Throws ApiError on non-ok responses so callers can discriminate by statusCode.
  */
 async function api<T>(path: string, token: string, opts?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -28,7 +43,7 @@ async function api<T>(path: string, token: string, opts?: RequestInit): Promise<
     } catch {
       // Fallback if response is not JSON
     }
-    throw new Error(errorMessage);
+    throw new ApiError(errorMessage, response.status);
   }
 
   return (await response.json()) as T;
@@ -38,41 +53,56 @@ async function api<T>(path: string, token: string, opts?: RequestInit): Promise<
  * 1. Ask backend to create DB record & generate upload URL
  * 2. Uploads file to IDrive e2 directly
  * 3. Tells backend upload is done
+ *
+ * Returns a Result — never throws. Callers pattern-match on ok/error.
  */
-export async function createAndUploadVideo(file: File, token: string) {
-  // Step 1: INIT
-  // Backend creates the Firestore document with "uploading" status
-  // and gives us a secure URL to upload the file.
-  const { videoId, uploadUrl } = await api<{ videoId: string; uploadUrl: string }>(
-    `/videos/init`,
-    token, 
-    {
-      method: "POST",
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type || "video/mp4",
-        size: file.size,
-      }),
+export async function createAndUploadVideo(
+  file: File,
+  token: string,
+): Promise<Result<{ videoId: string }, ApiError>> {
+  try {
+    // Step 1: INIT
+    const { videoId, uploadUrl } = await api<{ videoId: string; uploadUrl: string }>(
+      `/videos/init`,
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || "video/mp4",
+          size: file.size,
+        }),
+      },
+    );
+
+    // Step 2: UPLOAD directly to E2 storage via presigned URL
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "video/mp4" },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      return {
+        ok: false,
+        error: new ApiError("Failed to upload file to storage.", uploadResponse.status),
+      };
     }
-  );
 
-  // Step 2: UPLOAD
-  // Send file directly to Cloud storage (IDrive e2)
-  // Note: We use standard fetch here, not the api() helper, because
-  // we are hitting the external storage URL, not our backend.
-  await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "video/mp4" },
-    body: file,
-  });
+    // Step 3: COMPLETE — backend marks status "queued" and triggers worker
+    await api(`/videos/${videoId}/complete`, token, { method: "POST" });
 
-  // Step 3: COMPLETE
-  // Tell backend we are finished. Backend updates status to "queued".
-  await api(`/videos/${videoId}/complete`, token, {
-    method: "POST",
-  });
-
-  return { videoId };
+    return { ok: true, value: { videoId } };
+  } catch (e) {
+    if (e instanceof ApiError) return { ok: false, error: e };
+    return {
+      ok: false,
+      error: new ApiError(
+        e instanceof Error ? e.message : "Upload failed. Please try again.",
+        0,
+      ),
+    };
+  }
 }
 
 /**

@@ -117,6 +117,10 @@ class VideoService {
     // 2. Delete Firestore record
     await this.repo.deleteVideo(userId, videoId);
   }
+
+  async markFailed(userId, videoId, errorMessage) {
+    await this.repo.markFailed(userId, videoId, errorMessage);
+  }
 }
 
 module.exports = VideoService;

@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, FileVideo, Film, Upload, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileVideo, Film, Upload, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
+import type { Result } from "../videoService";
+import { ApiError } from "../videoService";
 
 interface UploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 
-  onUpload: (file: File) => Promise<{ videoId: string }>;
+  onUpload: (file: File) => Promise<Result<{ videoId: string }, ApiError>>;
 
   // future-proof: sessionUrl optional later
   onSeeAnalysis: (videoId: string, sessionUrl?: string) => void;
 }
 
-type UploadState = "idle" | "uploading" | "complete";
+type UploadState = "idle" | "uploading" | "complete" | "error";
 
 export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: UploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
@@ -21,6 +23,7 @@ export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: Upl
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [uploadedVideoId, setUploadedVideoId] = useState("");
 
@@ -31,6 +34,7 @@ export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: Upl
         setUploadState("idle");
         setUploadProgress(0);
         setUploadedVideoId("");
+        setErrorMessage(null);
       }, 300);
     }
   }, [open]);
@@ -64,18 +68,23 @@ export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: Upl
     if (!selectedFile) return;
 
     setUploadState("uploading");
+    setErrorMessage(null);
     const interval = setInterval(() => {
       setUploadProgress((prev) => (prev < 90 ? prev + 5 : prev));
     }, 200);
 
-    try {
-      const { videoId } = await onUpload(selectedFile);
-      setUploadedVideoId(videoId);
-      setUploadProgress(100);
-      setUploadState("complete");
-    } finally {
-      clearInterval(interval);
+    const result = await onUpload(selectedFile);
+    clearInterval(interval);
+
+    if (!result.ok) {
+      setErrorMessage(result.error.message);
+      setUploadState("error");
+      return;
     }
+
+    setUploadedVideoId(result.value.videoId);
+    setUploadProgress(100);
+    setUploadState("complete");
   };
 
   return (
@@ -213,6 +222,38 @@ export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: Upl
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {uploadState === "error" && (
+            <div className="w-full py-4 space-y-6">
+              <div className="flex items-start gap-4 p-5 bg-red-500/10 rounded-2xl border border-red-500/30">
+                <AlertCircle className="w-6 h-6 text-red-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground/90 mb-1">Upload failed</p>
+                  <p className="text-sm text-red-400">{errorMessage}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                  className="px-6 py-6 rounded-xl text-muted-foreground"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setUploadState("idle");
+                    setUploadProgress(0);
+                    setErrorMessage(null);
+                  }}
+                  className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                >
+                  Try Again
+                </Button>
               </div>
             </div>
           )}

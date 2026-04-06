@@ -56,6 +56,11 @@ class VideoRepository {
     const videoRef = this.db.collection('users').doc(userId).collection('videos').doc(videoId);
     await videoRef.delete();
   }
+
+  async markFailed(userId, videoId, errorMessage) {
+    const videoRef = this.db.collection('users').doc(userId).collection('videos').doc(videoId);
+    await videoRef.update({ status: 'failed', error: errorMessage, updatedAt: new Date() });
+  }
 }
 
 module.exports = VideoRepository;

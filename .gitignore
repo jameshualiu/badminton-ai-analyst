@@ -9,6 +9,8 @@ build/
 GEMINI.md
 CLAUDE.md
 
+backend/src/config/serviceAccount.json
+
 # OS
 .DS_Store
 

@@ -6,7 +6,7 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 import { UploadModal } from "../features/analysis/components/UploadModal";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
-import { createAndUploadVideo, deleteVideo } from "../features/analysis/videoService";
+import { createAndUploadVideo, deleteVideo, type Result, ApiError } from "../features/analysis/videoService";
 import { db } from "../lib/firebase";
 
 // ✅ adjust this import to where your VideoCard file actually lives
@@ -56,11 +56,10 @@ export default function DashboardPage() {
     }));
   }, [docs]);
 
-  const handleUpload = async (file: File) => {
-    if (!user) throw new Error("Not signed in");
+  const handleUpload = async (file: File): Promise<Result<{ videoId: string }, ApiError>> => {
+    if (!user) return { ok: false, error: new ApiError("Not signed in", 401) };
     const token = await user.getIdToken();
-    const { videoId } = await createAndUploadVideo(file, token);
-    return { videoId };
+    return createAndUploadVideo(file, token);
   };
 
   const handleSeeAnalysis = (videoId: string) => {

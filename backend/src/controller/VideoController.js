@@ -47,7 +47,18 @@ class VideoController {
                     userId: userId,
                     videoE2Key: videoData.input.e2Key
                 })
-            }).catch(err => console.error('❌ Modal Trigger Error:', err));
+            })
+            .then(async (response) => {
+                if (!response.ok) {
+                    const errText = await response.text().catch(() => '');
+                    console.error(`❌ Modal returned ${response.status}:`, errText);
+                    await this.service.markFailed(userId, videoId, `Worker trigger failed (${response.status})`);
+                }
+            })
+            .catch(async (err) => {
+                console.error('❌ Modal Trigger Error:', err);
+                await this.service.markFailed(userId, videoId, `Worker trigger error: ${err.message}`);
+            });
         }
     } catch (err) {
         console.error('❌ Error fetching video for Modal trigger:', err);
