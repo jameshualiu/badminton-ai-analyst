@@ -46,7 +46,7 @@ class BadmintonPipeline:
         point = np.array([[[x, y]]], dtype="float32")
         return cv2.perspectiveTransform(point, self.homography_matrix)[0][0].tolist()
 
-    def process_video(self, video_path, batch_size=8, limit_frames=3600):
+    def process_video(self, video_path, batch_size=16, limit_frames=3600):
         self.setup_homography(video_path)
         
         # Decode directly at TrackNet resolution (512x288) to skip CPU resizing

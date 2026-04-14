@@ -53,9 +53,15 @@ def process_badminton_video(data: dict):
     bucket = os.environ["R2_BUCKET_NAME"]
     
     # --- Firebase Setup ---
-    fb_cred_json = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT"])
+    fb_cred = {
+        "type": "service_account",
+        "project_id": os.environ["FIREBASE_PROJECT_ID"],
+        "private_key": os.environ["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
+        "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
+        "token_uri": "https://oauth2.googleapis.com/token",
+    }
     if not firebase_admin._apps:
-        cred = credentials.Certificate(fb_cred_json)
+        cred = credentials.Certificate(fb_cred)
         firebase_admin.initialize_app(cred)
     db = firestore.client()
     
@@ -69,10 +75,14 @@ def process_badminton_video(data: dict):
         onnx_path = MODELS_DIR / "tracknet.onnx"
         court_path = MODELS_DIR / "yolov8s-seg_court_detection.pt"
         net_path = MODELS_DIR / "yolov8s-seg_net_detection.pt"
-        
-        for m_path, m_key in [(onnx_path, "models/tracknet.onnx"), 
-                               (court_path, "models/yolov8s-seg_court_detection.pt"),
-                               (net_path, "models/yolov8s-seg_net_detection.pt")]:
+        pose_path = MODELS_DIR / "yolov8n-pose.pt"
+
+        for m_path, m_key in [
+            (onnx_path, "models/tracknet.onnx"),
+            (court_path, "models/yolov8s-seg_court_detection.pt"),
+            (net_path, "models/yolov8s-seg_net_detection.pt"),
+            (pose_path, "models/yolov8n-pose.pt"),
+        ]:
             if not m_path.exists():
                 print(f"📥 Fetching {m_key} from R2...")
                 s3.download_file(bucket, m_key, str(m_path))
@@ -84,7 +94,7 @@ def process_badminton_video(data: dict):
         s3.download_file(bucket, video_e2_key, local_video)
         
         # Step 4: Run Analysis Pipeline
-        inference = BadmintonInference(str(onnx_path), str(court_path), str(net_path))
+        inference = BadmintonInference(str(onnx_path), str(court_path), str(net_path), str(pose_path))
         pipeline = BadmintonPipeline(inference)
         results = pipeline.process_video(local_video)
         

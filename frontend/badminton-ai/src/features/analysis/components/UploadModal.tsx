@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { AlertCircle, CheckCircle2, FileVideo, Film, Upload, X } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
+import { db } from "../../../lib/firebase";
 import type { Result } from "../videoService";
 import { ApiError } from "../videoService";
 
 interface UploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-
+  userId: string;
   onUpload: (file: File) => Promise<Result<{ videoId: string }, ApiError>>;
 
   // future-proof: sessionUrl optional later
@@ -17,7 +19,7 @@ interface UploadModalProps {
 
 type UploadState = "idle" | "uploading" | "complete" | "error";
 
-export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: UploadModalProps) {
+export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysis }: UploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -38,6 +40,21 @@ export function UploadModal({ open, onOpenChange, onUpload, onSeeAnalysis }: Upl
       }, 300);
     }
   }, [open]);
+
+  // Watch Firestore for worker failures after upload completes
+  useEffect(() => {
+    if (uploadState !== "complete" || !uploadedVideoId || !userId) return;
+
+    const unsub = onSnapshot(doc(db, "users", userId, "videos", uploadedVideoId), (snap) => {
+      const status = snap.data()?.status;
+      if (status === "failed") {
+        setErrorMessage(snap.data()?.error ?? "Worker failed to process video.");
+        setUploadState("error");
+      }
+    });
+
+    return unsub;
+  }, [uploadState, uploadedVideoId, userId]);
 
   const handleDrag = (event: React.DragEvent) => {
     event.preventDefault();

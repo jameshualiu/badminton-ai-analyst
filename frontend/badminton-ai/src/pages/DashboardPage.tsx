@@ -159,6 +159,7 @@ export default function DashboardPage() {
       <UploadModal
         open={uploadOpen}
         onOpenChange={setUploadOpen}
+        userId={user?.uid ?? ""}
         onUpload={handleUpload}
         onSeeAnalysis={handleSeeAnalysis}
       />
