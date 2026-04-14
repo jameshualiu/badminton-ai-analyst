@@ -1,7 +1,7 @@
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { v4: uuidv4 } = require('uuid');
-const e2Client = require('../config/e2'); // Your E2 client configuration
+const r2Client = require('../config/r2');
 
 class VideoService {
   constructor(videoRepo) {
@@ -15,12 +15,12 @@ class VideoService {
 
     // A. Generate Presigned PUT URL (valid for 1 hour)
     const command = new PutObjectCommand({
-      Bucket: process.env.E2_BUCKET_NAME,
+      Bucket: process.env.R2_BUCKET_NAME,
       Key: e2Key,
       ContentType: fileMeta.contentType,
     });
     
-    const uploadUrl = await getSignedUrl(e2Client, command, { expiresIn: 3600 });
+    const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
 
     // B. Create the DB Document immediately
     await this.repo.createVideoDoc(userId, videoId, {
@@ -58,10 +58,10 @@ class VideoService {
     const generateGetUrl = async (key) => {
       if (!key) return null;
       const command = new GetObjectCommand({
-        Bucket: process.env.E2_BUCKET_NAME,
+        Bucket: process.env.R2_BUCKET_NAME,
         Key: key,
       });
-      return await getSignedUrl(e2Client, command, { expiresIn: 3600 });
+      return await getSignedUrl(r2Client, command, { expiresIn: 3600 });
     };
 
     // 3. Generate URL for original video
@@ -94,22 +94,22 @@ class VideoService {
     for (const prefix of prefixes) {
       try {
         const listCommand = new ListObjectsV2Command({
-          Bucket: process.env.E2_BUCKET_NAME,
+          Bucket: process.env.R2_BUCKET_NAME,
           Prefix: prefix,
         });
-        const listResponse = await e2Client.send(listCommand);
+        const listResponse = await r2Client.send(listCommand);
 
         if (listResponse.Contents && listResponse.Contents.length > 0) {
           const deleteCommand = new DeleteObjectsCommand({
-            Bucket: process.env.E2_BUCKET_NAME,
+            Bucket: process.env.R2_BUCKET_NAME,
             Delete: {
               Objects: listResponse.Contents.map(obj => ({ Key: obj.Key })),
             },
           });
-          await e2Client.send(deleteCommand);
+          await r2Client.send(deleteCommand);
         }
       } catch (err) {
-        console.error(`Failed to delete E2 objects for prefix ${prefix}:`, err);
+        console.error(`Failed to delete R2 objects for prefix ${prefix}:`, err);
         // We continue to delete the DB record even if S3 fails
       }
     }

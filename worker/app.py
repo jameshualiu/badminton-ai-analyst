@@ -42,15 +42,15 @@ def process_badminton_video(data: dict):
     from inference import BadmintonInference
     from pipeline import BadmintonPipeline
 
-    # --- S3/E2 Config ---
+    # --- R2 Config ---
     s3 = boto3.client(
         's3',
-        endpoint_url=os.environ["E2_ENDPOINT"],
-        region_name=os.environ.get("E2_REGION", "auto"),
-        aws_access_key_id=os.environ["E2_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["E2_SECRET_ACCESS_KEY"]
+        endpoint_url=os.environ["R2_ENDPOINT"],
+        region_name='auto',
+        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"]
     )
-    bucket = os.environ["E2_BUCKET_NAME"]
+    bucket = os.environ["R2_BUCKET_NAME"]
     
     # --- Firebase Setup ---
     fb_cred_json = json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT"])
@@ -74,7 +74,7 @@ def process_badminton_video(data: dict):
                                (court_path, "models/yolov8s-seg_court_detection.pt"),
                                (net_path, "models/yolov8s-seg_net_detection.pt")]:
             if not m_path.exists():
-                print(f"📥 Fetching {m_key} from E2...")
+                print(f"📥 Fetching {m_key} from R2...")
                 s3.download_file(bucket, m_key, str(m_path))
         models_volume.commit()
 
