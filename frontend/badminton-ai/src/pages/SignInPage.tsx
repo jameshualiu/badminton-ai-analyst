@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { ArrowLeft, Chrome, Lock, Mail, Sparkles } from "lucide-react";
+import { ArrowLeft, Chrome, Lock, Mail } from "lucide-react";
 import { signInWithEmail, signInWithGoogle } from "../auth/authActions";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
 
@@ -99,15 +99,6 @@ export default function SignInPage() {
       >
         {/* Header */}
         <div className="text-center mb-10">
-          <motion.div
-            className="inline-flex p-4 bg-gradient-to-br from-primary to-accent rounded-2xl shadow-2xl shadow-primary/35 mb-6"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            <Sparkles className="w-8 h-8" />
-          </motion.div>
-
           <motion.h1
             className="text-4xl mb-3 bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent"
             initial={{ opacity: 0, y: 20 }}
@@ -134,8 +125,6 @@ export default function SignInPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
-
           <form onSubmit={handleEmailSignIn} className="space-y-6 relative">
             {/* Error */}
             {error ? (

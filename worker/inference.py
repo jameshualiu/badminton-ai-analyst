@@ -1,14 +1,15 @@
 import numpy as np
-from court_detector import CourtDetectorAdapter, NetDetectorAdapter, PoseDetectorAdapter, TrackNetAdapter
+from court_detector import CourtDetectorAdapter, NetDetectorAdapter, YoloPoseAdapter, TrackNetAdapter, ShotClassifierAdapter
 
 
 class BadmintonInference:
-    def __init__(self, tracknet_path, court_kprcnn_path, net_kprcnn_path, pose_kprcnn_path):
+    def __init__(self, tracknet_path, court_kprcnn_path, net_kprcnn_path, yolo_pose_path, lstm_path=None):
         self.tracknet   = TrackNetAdapter(tracknet_path)
         self.court_det  = CourtDetectorAdapter(court_kprcnn_path)
         self.net_det    = NetDetectorAdapter(net_kprcnn_path)
-        self.pose_det   = PoseDetectorAdapter(pose_kprcnn_path)
-        print("🚀 All RCNN + TrackNet Models Loaded Successfully")
+        self.pose_det   = YoloPoseAdapter(yolo_pose_path)
+        self.shot_clf   = ShotClassifierAdapter(lstm_path) if lstm_path else None
+        print("🚀 All Models Loaded Successfully (TrackNet + RCNN + YOLO Pose)")
 
     def predict_ball_batch(self, batch_tensor: np.ndarray) -> np.ndarray:
         """
@@ -54,3 +55,8 @@ class BadmintonInference:
             "court_keypoints_6": kp6,
             "court_keypoints_35": kp35,
         }
+
+    def classify_shot(self, skeleton_sequence: list) -> str:
+        if self.shot_clf is None:
+            return "Unknown"
+        return self.shot_clf.classify(skeleton_sequence)

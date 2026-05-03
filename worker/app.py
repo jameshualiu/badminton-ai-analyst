@@ -15,6 +15,7 @@ worker_image = (
         "torchvision==0.17.2+cu121",
         extra_index_url="https://download.pytorch.org/whl/cu121",
     )
+    .pip_install("onnxruntime==1.20.1")
     .pip_install_from_requirements("worker/requirements.txt")
     .add_local_python_source("inference", "pipeline", "court_detector")
 )
@@ -85,7 +86,8 @@ def process_badminton_video(data: dict):
             "tracknet": "ball_track.pt",
             "court_kprcnn": "court_kpRCNN.pth",
             "net_kprcnn": "net_kpRCNN.pth",
-            "pose_kprcnn": "pose_kpRCNN.pth",
+            "yolo_pose": "yolo11x-pose.pt",
+            "lstm": "15Matches_LSTM.onnx",
         }
         resolved_paths = {}
 
@@ -122,7 +124,8 @@ def process_badminton_video(data: dict):
             resolved_paths["tracknet"],
             resolved_paths["court_kprcnn"],
             resolved_paths["net_kprcnn"],
-            resolved_paths["pose_kprcnn"],
+            resolved_paths["yolo_pose"],
+            lstm_path=resolved_paths.get("lstm"),
         )
         pipeline = BadmintonPipeline(inference)
         results = pipeline.process_video(local_video)

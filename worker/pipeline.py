@@ -46,6 +46,38 @@ class BadmintonPipeline:
         point = np.array([[[x, y]]], dtype="float32")
         return cv2.perspectiveTransform(point, self.homography_matrix)[0][0].tolist()
 
+    def _is_in_court(self, player: dict, kp6: list, padding: float = 20.0) -> bool:
+        """Return True if player's ankle midpoint is inside the court polygon."""
+        skel = player.get("skeleton", [])
+        box  = player.get("box", [])
+
+        la = skel[15] if len(skel) > 15 else None
+        ra = skel[16] if len(skel) > 16 else None
+
+        if la and ra and (la[0] or la[1]) and (ra[0] or ra[1]):
+            ax = (la[0] + ra[0]) / 2
+            ay = (la[1] + ra[1]) / 2
+        elif box and len(box) == 4:
+            ax = (box[0] + box[2]) / 2
+            ay = box[3]
+        else:
+            return False
+
+        TL, TR = kp6[0], kp6[1]
+        BL, BR = kp6[4], kp6[5]
+
+        if ay < TL[1] - padding or ay > BL[1] + padding:
+            return False
+
+        denom = BL[1] - TL[1]
+        if abs(denom) < 1:
+            return False
+        t = (ay - TL[1]) / denom
+        left_x  = TL[0] + t * (BL[0] - TL[0])
+        right_x = TR[0] + t * (BR[0] - TR[0])
+
+        return left_x - padding <= ax <= right_x + padding
+
     # -------------------------------------------------------------------------
     # STEP 1: Shuttle tracking — isolated Pass 1
     # -------------------------------------------------------------------------
@@ -120,6 +152,7 @@ class BadmintonPipeline:
         # --- Pass 2: Pose inference on all frames ---
         print(f"🧍 Pass 2: Pose inference...")
         player_tracking = []
+        kp6 = (self.geometry or {}).get("court_keypoints_6")
 
         for start_idx in range(0, total_frames, pose_batch_size):
             end_idx = min(start_idx + pose_batch_size, total_frames)
@@ -132,18 +165,25 @@ class BadmintonPipeline:
             per_frame_players = self.engine.predict_pose_batch(frames)
 
             for i in range(actual_batch_size):
-                player_tracking.append({"frame": start_idx + i, "players": per_frame_players[i]})
+                players = per_frame_players[i]
+                if kp6:
+                    players = [p for p in players if self._is_in_court(p, kp6)]
+                player_tracking.append({"frame": start_idx + i, "players": players})
 
             if start_idx % (pose_batch_size * 20) == 0 and start_idx > 0:
                 print(f"   💨 Pose pass: {start_idx}/{total_frames} frames...")
 
         hits = self._detect_hits_from_traj(shuttle_traj)
+        hits = self._classify_hits(hits, player_tracking, total_frames)
+
+        from collections import Counter
+        shot_counts = dict(Counter(h["type"] for h in hits))
 
         return {
             "summary": {
                 "durationSec": total_frames / (fps if fps > 0 else 30),
                 "totalShots": len(hits),
-                "shotCounts": {"Clear/Drop": len(hits)},
+                "shotCounts": shot_counts,
                 "resolution": [512, 288]
             },
             "geometry": self.geometry,
@@ -153,25 +193,111 @@ class BadmintonPipeline:
             "shuttle_debug": shuttle_traj,
         }
 
-    def _detect_hits_from_traj(self, shuttle_traj):
-        """Renamed from detect_hits — works from shuttle_traj list."""
-        hits = []
-        if len(shuttle_traj) < 5:
+    def _classify_hits(self, hits, player_tracking, total_frames):
+        """Classify each hit using the LSTM shot classifier."""
+        if not hits:
             return hits
-        for i in range(2, len(shuttle_traj) - 2):
-            curr = shuttle_traj[i]["pos"]
-            prev = shuttle_traj[i-1]["pos"]
-            if curr and prev:
-                dy = curr[1] - prev[1]
-                if i > 2 and 'dy_prev' in shuttle_traj[i-1]:
-                    if shuttle_traj[i-1]['dy_prev'] > 1.0 and dy < -1.0:
-                        hits.append({
-                            "frame": shuttle_traj[i]["frame"],
-                            "location_px": curr,
-                            "location_m": self.pixel_to_meters(curr[0], curr[1]),
-                            "type": "Clear/Drop"
-                        })
-                shuttle_traj[i]['dy_prev'] = dy
+
+        # COCO 17 → 13 keypoints: drop eyes (1,2) and ears (3,4)
+        COCO_SUBSET = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        WINDOW = 20  # ±20 frames = up to 41 total
+
+        tracking_by_frame = {entry["frame"]: entry["players"] for entry in player_tracking}
+
+        for hit in hits:
+            f = hit["frame"]
+            shuttle_x = (hit["location_px"] or [0])[0]
+
+            # Pick hitter: player whose ankle midpoint is closest to shuttle x
+            hitter_id = None
+            players_at_hit = tracking_by_frame.get(f, [])
+            if players_at_hit:
+                def foot_x(p):
+                    sk = p["skeleton"]
+                    lx = sk[15][0] if len(sk) > 15 and sk[15] else 0
+                    rx = sk[16][0] if len(sk) > 16 and sk[16] else 0
+                    if lx or rx:
+                        return (lx + rx) / 2
+                    box = p.get("box", [])
+                    return (box[0] + box[2]) / 2 if len(box) == 4 else 0
+                hitter_id = min(players_at_hit, key=lambda p: abs(foot_x(p) - shuttle_x))["id"]
+
+            # Build skeleton window of up to 41 frames
+            frame_range = range(max(0, f - WINDOW), min(total_frames, f + WINDOW + 1))
+            seq = []
+            for fi in frame_range:
+                players = tracking_by_frame.get(fi, [])
+                player = next((p for p in players if p["id"] == hitter_id), players[0] if players else None)
+                if player:
+                    sk = player["skeleton"]
+                    kps = [sk[i] for i in COCO_SUBSET]
+                else:
+                    kps = None
+                seq.append(kps)
+
+            hit["type"] = self.engine.classify_shot(seq)
+
+        return hits
+
+    def _detect_hits_from_traj(self, shuttle_traj):
+        """Detect hits via velocity direction change on the shuttle trajectory.
+
+        Requirements for a valid hit:
+        - Both surrounding velocity vectors exceed MIN_SPEED (filters jitter)
+        - The dot product of the two vectors is negative (>90° direction change)
+          OR there is a sign reversal in the dominant Y component
+        - At least MIN_GAP frames since the last accepted hit (debounce)
+        - No large tracking gap (>MAX_FRAME_GAP missing frames) on either side
+        """
+        MIN_SPEED = 5.0      # px/frame — below this is noise / stationary
+        MIN_GAP = 20         # frames — minimum spacing between accepted hits
+        MAX_FRAME_GAP = 6    # frames — skip if tracking lost for too long nearby
+
+        hits = []
+
+        # Collect only frames where the shuttle was confidently detected
+        valid = [(s["frame"], s["pos"][0], s["pos"][1])
+                 for s in shuttle_traj if s["pos"] is not None]
+
+        if len(valid) < 3:
+            return hits
+
+        last_hit_frame = -MIN_GAP
+
+        for k in range(1, len(valid) - 1):
+            f_prev, xp, yp = valid[k - 1]
+            f_curr, xc, yc = valid[k]
+            f_next, xn, yn = valid[k + 1]
+
+            # Skip if surrounding detections are too far apart
+            if f_curr - f_prev > MAX_FRAME_GAP or f_next - f_curr > MAX_FRAME_GAP:
+                continue
+
+            vx1, vy1 = xc - xp, yc - yp
+            vx2, vy2 = xn - xc, yn - yc
+
+            speed1 = (vx1 ** 2 + vy1 ** 2) ** 0.5
+            speed2 = (vx2 ** 2 + vy2 ** 2) ** 0.5
+
+            if speed1 < MIN_SPEED or speed2 < MIN_SPEED:
+                continue
+
+            dot = vx1 * vx2 + vy1 * vy2
+            # Detect both down→up AND up→down reversals
+            y_reversal = (vy1 > MIN_SPEED and vy2 < -MIN_SPEED) or \
+                         (vy1 < -MIN_SPEED and vy2 > MIN_SPEED)
+
+            if dot < 0 or y_reversal:
+                if f_curr - last_hit_frame < MIN_GAP:
+                    continue
+                hits.append({
+                    "frame": f_curr,
+                    "location_px": [xc, yc],
+                    "location_m": self.pixel_to_meters(xc, yc),
+                    "type": "Unknown"
+                })
+                last_hit_frame = f_curr
+
         return hits
 
     # Keep old name as alias so existing callers don't break

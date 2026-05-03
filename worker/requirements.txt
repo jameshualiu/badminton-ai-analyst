@@ -8,3 +8,5 @@ google-cloud-firestore
 python-dotenv
 firebase-admin
 fastapi
+onnxruntime
+ultralytics

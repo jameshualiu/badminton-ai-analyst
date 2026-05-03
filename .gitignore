@@ -36,6 +36,9 @@ test_vids/
 "test vids/"
 test vids/
 
+worker/weights/
+worker/scripts/
+
 
 # IDEs
 .vscode/
