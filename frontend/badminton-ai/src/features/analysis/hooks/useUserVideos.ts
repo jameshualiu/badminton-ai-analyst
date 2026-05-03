@@ -17,11 +17,7 @@ export function useUserVideos(uid?: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid) {
-      setVideos([]);
-      setLoading(false);
-      return;
-    }
+    if (!uid) return;
 
     const q = query(collection(db, "users", uid, "videos"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -32,5 +28,5 @@ export function useUserVideos(uid?: string) {
     return () => unsub();
   }, [uid]);
 
-  return { videos, loading };
+  return { videos: uid ? videos : [], loading: uid ? loading : false };
 }

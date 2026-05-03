@@ -129,19 +129,19 @@ export default function DashboardPage() {
   const { uploadTrigger } = useOutletContext<{ uploadTrigger: number }>();
   const [uploadOpen, setUploadOpen] = useState(false);
   const { user } = useAuthUser();
-  const [docs, setDocs] = useState<RawVideoDoc[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rawDocs, setDocs] = useState<RawVideoDoc[]>([]);
+  const [rawLoading, setLoading] = useState(true);
+  const docs = useMemo(() => (user ? rawDocs : []), [user, rawDocs]);
+  const loading = user ? rawLoading : false;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (uploadTrigger > 0) setUploadOpen(true);
   }, [uploadTrigger]);
 
   useEffect(() => {
-    if (!user) {
-      setDocs([]);
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
+
     const q = query(
       collection(db, "users", user.uid, "videos"),
       orderBy("createdAt", "desc"),

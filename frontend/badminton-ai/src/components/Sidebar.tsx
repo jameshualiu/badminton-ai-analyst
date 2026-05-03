@@ -15,7 +15,7 @@ import { logout } from "../auth/authActions";
 interface SidebarProps {
   onUploadClick?: () => void;
   activeAnalysisView?: string;
-  onAnalysisViewChange?: (view: any) => void;
+  onAnalysisViewChange?: (view: string) => void;
 }
 
 export default function Sidebar({
