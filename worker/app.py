@@ -7,12 +7,17 @@ from pathlib import Path
 app = modal.App("badminton-ai-worker")
 
 # 2. Define the GPU Environment (Container Image)
-# Based on documentation: add_local_python_source takes module names
 worker_image = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04", add_python="3.11")
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
+    .pip_install(
+        "torch==2.2.2+cu121",
+        "torchvision==0.17.2+cu121",
+        extra_index_url="https://download.pytorch.org/whl/cu121",
+    )
+    .pip_install("onnxruntime==1.20.1")
     .pip_install_from_requirements("worker/requirements.txt")
-    .add_local_python_source("inference", "pipeline") 
+    .add_local_python_source("inference", "pipeline", "court_detector")
 )
 
 # 3. Create a Modal Volume for Persistent Model Storage
@@ -68,33 +73,60 @@ def process_badminton_video(data: dict):
     video_doc_ref = db.collection("users").document(user_id).collection("videos").document(video_id)
     
     try:
-        # Step 1: Update Status to "running"
+        # Step 1: Status Update & Volume Check
         video_doc_ref.update({"status": "running"})
+        print(f"🔍 Diagnostic: Scanning Volume at {MODELS_DIR}")
         
-        # Step 2: Ensure Models are synced to Volume
-        onnx_path = MODELS_DIR / "tracknet.onnx"
-        court_path = MODELS_DIR / "yolov8s-seg_court_detection.pt"
-        net_path = MODELS_DIR / "yolov8s-seg_net_detection.pt"
-        pose_path = MODELS_DIR / "yolov8n-pose.pt"
+        # Build a map of what's actually in the volume (recursively)
+        all_volume_files = {f.name: f for f in MODELS_DIR.glob("**/*") if f.is_file()}
+        print(f"📁 Volume contains: {list(all_volume_files.keys())}")
 
-        for m_path, m_key in [
-            (onnx_path, "models/tracknet.onnx"),
-            (court_path, "models/yolov8s-seg_court_detection.pt"),
-            (net_path, "models/yolov8s-seg_net_detection.pt"),
-            (pose_path, "models/yolov8n-pose.pt"),
-        ]:
-            if not m_path.exists():
-                print(f"📥 Fetching {m_key} from R2...")
-                s3.download_file(bucket, m_key, str(m_path))
+        # Step 2: Resolve Model Paths (Smart Search)
+        model_targets = {
+            "tracknet": "ball_track.pt",
+            "court_kprcnn": "court_kpRCNN.pth",
+            "net_kprcnn": "net_kpRCNN.pth",
+            "yolo_pose": "yolo11x-pose.pt",
+            "lstm": "15Matches_LSTM.onnx",
+        }
+        resolved_paths = {}
+
+        for key, filename in model_targets.items():
+            if filename in all_volume_files:
+                resolved_paths[key] = str(all_volume_files[filename])
+                print(f"✅ Found {filename} in Volume at: {resolved_paths[key]}")
+            else:
+                # Backup: Try to download from R2 if missing from Volume
+                target_path = MODELS_DIR / filename
+                print(f"📡 {filename} missing from Volume. Attempting R2 download: models/{filename}")
+                try:
+                    s3.download_file(bucket, f"models/{filename}", str(target_path))
+                    resolved_paths[key] = str(target_path)
+                    print(f"✅ Successfully recovered {filename} from R2")
+                except Exception as e:
+                    print(f"❌ 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
+                    raise e
+
         models_volume.commit()
 
         # Step 3: Download Raw Video
         local_video = f"/tmp/{video_id}.mp4"
-        print(f"🎬 Downloading video: {video_e2_key}")
-        s3.download_file(bucket, video_e2_key, local_video)
+        print(f"🎬 Downloading video: {video_e2_key} from {bucket}")
+        try:
+            s3.download_file(bucket, video_e2_key, local_video)
+        except Exception as e:
+            print(f"❌ Video Download Error: {e}")
+            raise e
         
         # Step 4: Run Analysis Pipeline
-        inference = BadmintonInference(str(onnx_path), str(court_path), str(net_path), str(pose_path))
+        print("⚙️ Initializing AI Engine...")
+        inference = BadmintonInference(
+            resolved_paths["tracknet"],
+            resolved_paths["court_kprcnn"],
+            resolved_paths["net_kprcnn"],
+            resolved_paths["yolo_pose"],
+            lstm_path=resolved_paths.get("lstm"),
+        )
         pipeline = BadmintonPipeline(inference)
         results = pipeline.process_video(local_video)
         

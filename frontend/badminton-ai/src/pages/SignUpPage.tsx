@@ -226,7 +226,7 @@ export default function SignUpPage() {
             <motion.button
               type="submit"
               disabled={loading}
-              className="group w-full py-4 bg-gradient-to-br from-primary via-primary to-accent rounded-xl shadow-lg shadow-primary/40 hover:shadow-xl hover:shadow-primary/60 transition-all relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group w-full py-4 bg-gradient-to-br from-primary via-primary to-accent rounded-xl cursor-pointer font-medium text-primary-foreground transition-all relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
               whileHover={{ scale: loading ? 1 : 1.02 }}
               whileTap={{ scale: loading ? 1 : 0.98 }}
             >
@@ -256,7 +256,7 @@ export default function SignUpPage() {
               className="group w-full py-4 bg-card/40 backdrop-blur-sm border border-border/60 hover:bg-card/60 hover:border-primary/50 rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Chrome className="w-5 h-5" />
-              <span>{loading ? "Please wait..." : "Continue with Google"}</span>
+              <span className="cursor-pointer">{loading ? "Please wait..." : "Continue with Google"}</span>
             </button>
 
             {/* Sign in link */}
@@ -265,7 +265,7 @@ export default function SignUpPage() {
               <button
                 type="button"
                 onClick={() => navigate("/signin")}
-                className="text-primary hover:opacity-80 transition"
+                className="text-primary cursor-pointer hover:opacity-80 transition"
               >
                 Sign in
               </button>

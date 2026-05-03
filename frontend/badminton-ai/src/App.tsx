@@ -9,7 +9,7 @@ import AnalysisPage from "./pages/AnalysisPage";
 
 export default function App() {
   return (
-    <div className="theme-amethyst min-h-screen bg-background text-foreground">
+    <div className="theme-dark-blue min-h-screen bg-background text-foreground">
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<SignInPage />} />

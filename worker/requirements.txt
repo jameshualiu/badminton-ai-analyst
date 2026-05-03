@@ -1,9 +1,12 @@
+torch
+torchvision
+numpy<2
 decord
-ultralytics==8.3.70
-onnxruntime-gpu
 opencv-python-headless
 boto3
 google-cloud-firestore
 python-dotenv
 firebase-admin
 fastapi
+onnxruntime
+ultralytics

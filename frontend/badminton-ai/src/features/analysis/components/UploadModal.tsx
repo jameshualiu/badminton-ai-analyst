@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { AlertCircle, CheckCircle2, FileVideo, Film, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileVideo,
+  Film,
+  Upload,
+  X,
+} from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 import { db } from "../../../lib/firebase";
 import type { Result } from "../videoService";
 import { ApiError } from "../videoService";
@@ -19,7 +31,13 @@ interface UploadModalProps {
 
 type UploadState = "idle" | "uploading" | "complete" | "error";
 
-export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysis }: UploadModalProps) {
+export function UploadModal({
+  open,
+  onOpenChange,
+  userId,
+  onUpload,
+  onSeeAnalysis,
+}: UploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -45,13 +63,18 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
   useEffect(() => {
     if (uploadState !== "complete" || !uploadedVideoId || !userId) return;
 
-    const unsub = onSnapshot(doc(db, "users", userId, "videos", uploadedVideoId), (snap) => {
-      const status = snap.data()?.status;
-      if (status === "failed") {
-        setErrorMessage(snap.data()?.error ?? "Worker failed to process video.");
-        setUploadState("error");
-      }
-    });
+    const unsub = onSnapshot(
+      doc(db, "users", userId, "videos", uploadedVideoId),
+      (snap) => {
+        const status = snap.data()?.status;
+        if (status === "failed") {
+          setErrorMessage(
+            snap.data()?.error ?? "Worker failed to process video.",
+          );
+          setUploadState("error");
+        }
+      },
+    );
 
     return unsub;
   }, [uploadState, uploadedVideoId, userId]);
@@ -59,7 +82,8 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
   const handleDrag = (event: React.DragEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    if (event.type === "dragenter" || event.type === "dragover") setDragActive(true);
+    if (event.type === "dragenter" || event.type === "dragover")
+      setDragActive(true);
     if (event.type === "dragleave") setDragActive(false);
   };
 
@@ -106,7 +130,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-card/40 border border-border/50 backdrop-blur-sm text-foreground shadow-2xl shadow-primary/10 p-0 overflow-hidden gap-0">
+      <DialogContent className="theme-dark-blue sm:max-w-xl bg-[#0d1520] border border-primary/20 backdrop-blur-sm text-foreground shadow-[0_0_0_1px_rgba(137,194,217,0.08),0_24px_64px_rgba(0,0,0,0.6)] p-0 overflow-hidden gap-0">
         <DialogHeader className="p-6 border-b border-border/40 bg-background/20">
           <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
             <Film className="w-5 h-5 text-primary" />
@@ -142,18 +166,24 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                 <div className="flex flex-col items-center gap-4 p-6 text-center z-10">
                   <div
                     className={`p-5 rounded-full transition-all duration-300 ${
-                      dragActive ? "bg-primary/20" : "bg-card/30 group-hover:bg-primary/10"
+                      dragActive
+                        ? "bg-primary/20"
+                        : "bg-card/30 group-hover:bg-primary/10"
                     }`}
                   >
                     <Upload
                       className={`w-10 h-10 transition-colors ${
-                        dragActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                        dragActive
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-primary"
                       }`}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-xl font-medium text-foreground/90">Drag and drop your video</p>
+                    <p className="text-xl font-medium text-foreground/90">
+                      Drag and drop your video
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       or{" "}
                       <button
@@ -182,7 +212,9 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                       {selectedFile.name}
                     </p>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span>{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                      <span>
+                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </span>
                       <span className="text-primary/80">Ready to upload</span>
                     </div>
                   </div>
@@ -200,15 +232,24 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                   <Button
                     variant="ghost"
                     onClick={() => onOpenChange(false)}
-                    className="px-6 py-6 rounded-xl text-muted-foreground"
+                    className="px-6 py-6 rounded-xl cursor-pointer text-muted-foreground"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleUploadClick}
-                    className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                    className="w-26 py-6 rounded-xl cursor-pointer items-center gap-2 border-none bg-primary text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90 hover:scale-[1.02]"
                   >
-                    Upload Analysis
+                    <svg width="12" height="12" viewBox="0 0 11 11" fill="none">
+                      <path
+                        d="M5.5 1v7M3 3.5l2.5-2.5L8 3.5M1 9.5h9"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Upload
                   </Button>
                 </div>
               </div>
@@ -231,7 +272,9 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Upload Progress</span>
-                  <span className="text-primary font-medium">{uploadProgress}%</span>
+                  <span className="text-primary font-medium">
+                    {uploadProgress}%
+                  </span>
                 </div>
                 <div className="relative h-2 w-full overflow-hidden rounded-full bg-card/25">
                   <div
@@ -248,7 +291,9 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
               <div className="flex items-start gap-4 p-5 bg-red-500/10 rounded-2xl border border-red-500/30">
                 <AlertCircle className="w-6 h-6 text-red-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground/90 mb-1">Upload failed</p>
+                  <p className="font-medium text-foreground/90 mb-1">
+                    Upload failed
+                  </p>
                   <p className="text-sm text-red-400">{errorMessage}</p>
                 </div>
               </div>
@@ -283,9 +328,11 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-lg text-foreground/90 truncate mb-1">
-                    Finished uploading
+                    Your video is uploaded!
                   </p>
-                  <p className="text-sm text-muted-foreground">Ready to view</p>
+                  <p className="text-sm text-muted-foreground">
+                    Our AI models will review your video and give feedback.
+                  </p>
                 </div>
               </div>
 
@@ -298,7 +345,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                   Close
                 </Button>
                 <Button
-                  className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                  className="w-33 py-6 rounded-xl cursor-pointer items-center gap-2 border-none bg-primary text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90 hover:scale-[1.02]"
                   onClick={() => {
                     onSeeAnalysis(uploadedVideoId);
                     onOpenChange(false);

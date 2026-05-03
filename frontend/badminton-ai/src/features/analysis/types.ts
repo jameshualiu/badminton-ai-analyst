@@ -20,6 +20,17 @@ export interface AnalysisShot {
     type: string;
 }
 
+export interface TrackingPlayer {
+    id: number;
+    skeleton: ([number, number] | null)[];
+    box: [number, number, number, number];
+}
+
+export interface TrackingFrame {
+    frame: number;
+    players: TrackingPlayer[];
+}
+
 export interface AnalysisData {
     summary: {
         durationSec: number;
@@ -30,7 +41,10 @@ export interface AnalysisData {
     geometry: {
         court: [number, number][] | null;
         net: [number, number][] | null;
+        court_keypoints_6: [number, number][] | null;   // [TL, TR, ML, MR, BL, BR]
+        court_keypoints_35: [number, number][] | null;  // 7 rows x 5 cols expanded grid
     } | null;
     events: AnalysisShot[];
-    tracking: unknown[];
+    tracking: TrackingFrame[];
+    shuttle_debug?: { frame: number; pos: [number, number] | null; confidence: number }[];
 }

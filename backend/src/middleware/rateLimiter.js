@@ -27,7 +27,7 @@ const globalLimiter = rateLimit({
  */
 const uploadLimiter = rateLimit({
 	windowMs: 30 * 60 * 1000, // 30 minutes
-	max: 5, 
+	max: 10, 
 	message: {
         status: 429,
         message: 'Too many upload attempts. Please wait 30 minutes before trying again.'

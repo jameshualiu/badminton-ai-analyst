@@ -63,6 +63,12 @@
   /* Your extra tokens (so bg-glow/bg-glow-2 work) */
   --color-glow: var(--glow);
   --color-glow-2: var(--glow-2);
+
+  /* Dark Blue theme specific surface colors */
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 /**
@@ -104,6 +110,9 @@
   --glow: #e0b1cb;
   --glow-2: #6549ba;
 
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+
   /* optional charts (leave or remove) */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -121,7 +130,38 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Theme: Amethyst (change one class in App.tsx to switch themes) */
+/* Theme: Dark Blue (Shuttleye Brand) */
+.theme-dark-blue {
+  --background: #080c10;
+  --foreground: #a9d6e5;
+
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: #a9d6e5;
+
+  --popover: #0d1520;
+  --popover-foreground: #a9d6e5;
+
+  --primary: #89c2d9;
+  --primary-foreground: #080c10;
+
+  --secondary: rgba(137, 194, 217, 0.1);
+  --secondary-foreground: #a9d6e5;
+
+  --muted: rgba(169, 214, 229, 0.65);
+  --muted-foreground: rgba(169, 214, 229, 0.3);
+
+  --accent: #89c2d9;
+  --accent-foreground: #080c10;
+
+  --border: rgba(137, 194, 217, 0.09);
+  --input: rgba(137, 194, 217, 0.09);
+  --ring: #89c2d9;
+
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+}
+
+/* Theme: Amethyst */
 .theme-amethyst {
   --background: #07050d;       /* dark_amethyst 100 */
   --foreground: #ffffff;
@@ -189,6 +229,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans text-[14.5px];
   }
 }
