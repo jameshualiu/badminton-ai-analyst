@@ -8,6 +8,9 @@ build/
 
 # Secrets & credentials
 serviceAccount.json
+
+# Planning docs
+ARTHUR_INTEGRATION_PLAN.md
 service-account.json
 service_account.json
 *-serviceaccount.json
@@ -37,6 +40,9 @@ test_vids/
 test vids/
 
 worker/weights/
+worker/debug_files/
+worker/debug_hits_output/
+worker/debug_hits.py
 worker/scripts/
 
 

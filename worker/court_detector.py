@@ -306,8 +306,10 @@ class ShotClassifierAdapter:
     # COCO 17 indices to keep: nose + shoulders/elbows/wrists + hips/knees/ankles (drops eyes/ears)
     COCO_SUBSET = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     CLASSES = ["Clear", "Drive", "Drop", "Lob", "Net", "Smash"]
-    FRAME_W = 512.0
-    FRAME_H = 288.0
+
+    # Scale YOLO 512×288 keypoints to 1280×720 — the likely resolution of training videos
+    SCALE_X = 1280.0 / 512.0
+    SCALE_Y = 720.0  / 288.0
 
     def __init__(self, weights_path: str):
         import onnxruntime as ort
@@ -316,7 +318,8 @@ class ShotClassifierAdapter:
             providers=["CPUExecutionProvider"],
         )
         self._input_name = self._session.get_inputs()[0].name
-        print(f"🎯 ShotClassifierAdapter loaded: {weights_path}")
+        out_shape = self._session.get_outputs()[0].shape
+        print(f"🎯 ShotClassifierAdapter loaded: {weights_path} | output shape={out_shape}")
 
     def classify(self, skeleton_sequence: list) -> str:
         """
@@ -330,7 +333,10 @@ class ShotClassifierAdapter:
         for t, kps in enumerate(skeleton_sequence):
             if kps:
                 for k, (x, y) in enumerate(kps):
-                    arr[0, t, k * 2]     = x / self.FRAME_W
-                    arr[0, t, k * 2 + 1] = y / self.FRAME_H
+                    arr[0, t, k * 2]     = x * self.SCALE_X
+                    arr[0, t, k * 2 + 1] = y * self.SCALE_Y
         probs = self._session.run(None, {self._input_name: arr})[0]
-        return self.CLASSES[int(np.argmax(probs[0]))]
+        idx = int(np.argmax(probs[0]))
+        label = self.CLASSES[idx] if idx < len(self.CLASSES) else f"Class{idx}"
+        print(f"[LSTM] probs={[round(v, 3) for v in probs[0].tolist()]} → {label}")
+        return label

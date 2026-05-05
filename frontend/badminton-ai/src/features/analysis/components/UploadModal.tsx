@@ -312,7 +312,7 @@ export function UploadModal({
                     setUploadProgress(0);
                     setErrorMessage(null);
                   }}
-                  className="px-8 py-6 rounded-xl bg-gradient-to-br from-primary to-accent text-foreground font-medium shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                  className="w-26 py-6 rounded-xl cursor-pointer items-center gap-2 border-none bg-primary text-[14px] font-medium text-primary-foreground transition-all hover:opacity-90 hover:scale-[1.02]"
                 >
                   Try Again
                 </Button>
