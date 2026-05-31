@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { ArrowLeft, Chrome, Lock, Mail } from "lucide-react";
+import { Chrome, Lock, Mail, Sparkles } from "lucide-react";
 import { signInWithEmail, signInWithGoogle } from "../auth/authActions";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
 
@@ -11,227 +11,161 @@ export default function SignInPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate("/dashboard", { replace: true });
-    }
+    if (!authLoading && user) navigate("/dashboard", { replace: true });
   }, [user, authLoading, navigate]);
 
   if (authLoading || user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-[3px] border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const handleEmailSignIn = async (event: React.FormEvent) => {
-    event.preventDefault();
-
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     setLoading(true);
-
     const res = await signInWithEmail(email, password);
-
     setLoading(false);
-
-    if (!res.ok) {
-      setError(res.error.message);
-      return;
-    }
-
+    if (!res.ok) { setError(res.error.message); return; }
     navigate("/dashboard");
   };
 
   const handleGoogleSignIn = async () => {
     setError(null);
     setLoading(true);
-
     const res = await signInWithGoogle();
-
     setLoading(false);
-
-    if (!res.ok) {
-      setError(res.error.message);
-      return;
-    }
-
+    if (!res.ok) { setError(res.error.message); return; }
     navigate("/dashboard");
   };
 
+  const inputClass = "w-full pl-10 pr-4 py-3 bg-white dark:bg-card border border-slate-300 dark:border-border rounded-xl text-foreground placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all";
+
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center overflow-hidden relative">
-      {/* Background orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-1/4 right-1/4 w-[600px] h-[600px] rounded-full bg-glow/25 blur-[110px] mix-blend-screen transform-gpu will-change-transform"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.45, 0.25] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-glow-2/20 blur-[100px] mix-blend-screen transform-gpu will-change-transform"
-          animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
 
-      {/* Back */}
-      <motion.button
-        onClick={() => navigate("/")}
-        className="absolute top-8 left-8 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors z-10"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </motion.button>
-
-      <motion.div
-        className="relative z-10 w-full max-w-md mx-4"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        {/* Header */}
-        <div className="text-center mb-10">
-          <motion.h1
-            className="text-4xl mb-3 bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
+      <header className="w-full border-b border-slate-200 dark:border-border bg-white/90 dark:bg-background/90 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate("/")}
+            className="cursor-pointer flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            Welcome Back
-          </motion.h1>
-
-          <motion.p
-            className="text-muted-foreground"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
-            Sign in to continue your analysis
-          </motion.p>
+            <div className="p-1.5 bg-primary/10 border border-primary/20 rounded-lg">
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+            <span className="text-[17px] font-semibold tracking-tight text-foreground">Shuttleye</span>
+          </button>
         </div>
+      </header>
 
-        {/* Card */}
+      <div className="flex-1 flex items-center justify-center px-4 py-16">
         <motion.div
-          className="bg-gradient-to-br from-card/70 to-background/40 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl shadow-primary/15 relative overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
+          className="w-full max-w-md"
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
+          transition={{ duration: 0.5 }}
         >
-          <form onSubmit={handleEmailSignIn} className="space-y-6 relative">
-            {/* Error */}
-            {error ? (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {error}
-              </div>
-            ) : null}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Welcome back</h1>
+            <p className="text-slate-500 dark:text-slate-400">Sign in to continue your analysis</p>
+          </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm text-muted-foreground mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/60" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full pl-12 pr-4 py-4 bg-background/30 border border-border/60 rounded-xl text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
+          <div className="bg-white dark:bg-card border border-slate-300 dark:border-border rounded-2xl p-8 shadow-sm">
+            <form onSubmit={handleEmailSignIn} className="space-y-5">
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm text-muted-foreground mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground/60" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-12 pr-4 py-4 bg-background/30 border border-border/60 rounded-xl text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
+              {error && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
 
-            {/* Forgot password */}
-            <div className="text-right">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className={inputClass}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">Password</label>
+                  <button type="button" className="cursor-pointer text-sm text-primary hover:text-primary/80 transition-colors">
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={inputClass}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="cursor-pointer w-full py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              >
+                {loading ? "Signing in…" : "Sign In"}
+              </button>
+
+              {/* Divider */}
+              <div className="relative my-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200 dark:border-border" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white dark:bg-card text-slate-400 dark:text-slate-500">or</span>
+                </div>
+              </div>
+
               <button
                 type="button"
-                className="text-sm text-primary hover:opacity-80 transition"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="cursor-pointer w-full py-3 bg-white dark:bg-card text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-border rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-white/10 hover:border-slate-400 dark:hover:border-border hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
-                Forgot password?
+                <Chrome className="w-4 h-4" />
+                {loading ? "Please wait…" : "Continue with Google"}
               </button>
-            </div>
 
-            {/* Submit */}
-            <motion.button
-              type="submit"
-              disabled={loading}
-              className="group w-full py-4 bg-gradient-to-br from-primary via-primary to-accent rounded-xl shadow-lg shadow-primary/40 hover:shadow-xl hover:shadow-primary/60 transition-all relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
-              whileHover={{ scale: loading ? 1 : 1.02 }}
-              whileTap={{ scale: loading ? 1 : 0.98 }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <span className="relative text-lg font-semibold">
-                {loading ? "Signing In..." : "Sign In"}
-              </span>
-            </motion.button>
-
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border/40" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-transparent text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            {/* Google */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="group w-full py-4 bg-card/40 backdrop-blur-sm border border-border/60 hover:bg-card/60 hover:border-primary/50 rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Chrome className="w-5 h-5" />
-              <span>{loading ? "Please wait..." : "Continue with Google"}</span>
-            </button>
-
-            {/* Sign up link */}
-            <p className="text-center mt-2 text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                className="text-primary hover:opacity-80 transition"
-                onClick={() => navigate("/signup")}
-              >
-                Sign up
-              </button>
-            </p>
-          </form>
+              <p className="text-center text-sm text-slate-500 dark:text-slate-400 pt-1">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  className="cursor-pointer text-primary font-medium hover:text-primary/80 transition-colors"
+                  onClick={() => navigate("/signup")}
+                >
+                  Sign up
+                </button>
+              </p>
+            </form>
+          </div>
         </motion.div>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,32 +1,21 @@
 import { Timestamp, doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { db } from "../lib/firebase";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
 import { shotColor } from "../utils/shotUtils";
+import LiveTracker from "../features/analysis/components/LiveTracker";
 import type {
   AnalysisData,
+  AnalysisShot,
   TrackingFrame,
   VideoStatus,
 } from "../features/analysis/types";
 
 const COCO_PAIRS: [number, number][] = [
-  [0, 1],
-  [0, 2],
-  [1, 3],
-  [2, 4],
-  [5, 6],
-  [5, 7],
-  [7, 9],
-  [6, 8],
-  [8, 10],
-  [5, 11],
-  [6, 12],
-  [11, 12],
-  [11, 13],
-  [13, 15],
-  [12, 14],
-  [14, 16],
+  [0, 1], [0, 2], [1, 3], [2, 4], [5, 6], [5, 7], [7, 9],
+  [6, 8], [8, 10], [5, 11], [6, 12], [11, 12], [11, 13],
+  [13, 15], [12, 14], [14, 16],
 ];
 
 type FirestoreVideoDoc = {
@@ -62,9 +51,6 @@ function fmtDate(ts: Timestamp | undefined): string {
 
 export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
-  const { activeAnalysisView: activeView } = useOutletContext<{
-    activeAnalysisView: string;
-  }>();
   const { user } = useAuthUser();
 
   const [docData, setDocData] = useState<FirestoreVideoDoc | null>(null);
@@ -211,10 +197,10 @@ export default function AnalysisPage() {
       }
 
       if (ov.pose && analysisData.tracking?.length) {
-        const entry =
-          trackingByFrame.get(frame) ??
-          trackingByFrame.get(frame - 1) ??
-          trackingByFrame.get(frame + 1);
+        let entry = trackingByFrame.get(frame);
+        for (let off = 1; off <= 3 && !entry; off++) {
+          entry = trackingByFrame.get(frame - off) ?? trackingByFrame.get(frame + off);
+        }
         if (entry) {
           const playerColors = ["#89c2d9", "#2c7da0"];
           entry.players.forEach((player, pi) => {
@@ -225,6 +211,8 @@ export default function AnalysisPage() {
               const pa = player.skeleton[a],
                 pb = player.skeleton[b];
               if (!pa || !pb) return;
+              if (pa[0] === 0 && pa[1] === 0) return;
+              if (pb[0] === 0 && pb[1] === 0) return;
               const [ax, ay] = sc(pa);
               const [bx, by] = sc(pb);
               ctx.beginPath();
@@ -234,7 +222,7 @@ export default function AnalysisPage() {
             });
             ctx.fillStyle = color;
             player.skeleton.forEach((pt) => {
-              if (!pt) return;
+              if (!pt || (pt[0] === 0 && pt[1] === 0)) return;
               const [x, y] = sc(pt);
               ctx.beginPath();
               ctx.arc(x, y, 1.5, 0, Math.PI * 2);
@@ -245,10 +233,10 @@ export default function AnalysisPage() {
       }
 
       if (ov.shuttle && analysisData.shuttle_debug?.length) {
-        const entry =
-          shuttleByFrame.get(frame) ??
-          shuttleByFrame.get(frame - 1) ??
-          shuttleByFrame.get(frame + 1);
+        let entry = shuttleByFrame.get(frame);
+        for (let off = 1; off <= 3 && !entry?.pos; off++) {
+          entry = shuttleByFrame.get(frame - off) ?? shuttleByFrame.get(frame + off);
+        }
         if (entry?.pos) {
           const [x, y] = sc(entry.pos);
           ctx.shadowBlur = 5;
@@ -313,8 +301,15 @@ export default function AnalysisPage() {
   const toggleOv = (k: keyof typeof ov) =>
     setOv((prev) => ({ ...prev, [k]: !prev[k] }));
 
-  const shotEvents: import("../features/analysis/types").AnalysisShot[] =
-    analysisData?.events ?? [];
+  const shotEvents: AnalysisShot[] = analysisData?.events ?? [];
+
+  const shuttleVisibility = useMemo(() => {
+    if (!analysisData?.shuttle_debug?.length) return null;
+    const detected = analysisData.shuttle_debug.filter(s => s.pos !== null).length;
+    const total = analysisData.shuttle_debug.length;
+    return { detected, total, pct: Math.round((detected / total) * 100) };
+  }, [analysisData]);
+
   const metaLine = [
     fmtDate(docData?.createdAt),
     duration ? fmtTime(duration) : null,
@@ -324,13 +319,13 @@ export default function AnalysisPage() {
     .join(" · ");
 
   return (
-    <main className="flex-1 p-8 flex flex-col gap-6 min-w-0 overflow-y-auto max-w-[1400px]">
+    <main className="flex-1 p-8 flex flex-col gap-6 min-w-0 overflow-y-auto w-full">
       {loading ? (
-        <div className="flex items-center justify-center p-8 text-[14px] text-muted">
+        <div className="flex items-center justify-center p-8 text-[14px] text-slate-500 dark:text-slate-400">
           Loading your analysis…
         </div>
       ) : !docData ? (
-        <div className="flex items-center justify-center p-8 text-[14px] text-muted">
+        <div className="flex items-center justify-center p-8 text-[14px] text-slate-500 dark:text-slate-400">
           Analysis not found
         </div>
       ) : (
@@ -342,22 +337,20 @@ export default function AnalysisPage() {
                 {docData.title ?? "Match Analysis"}
               </div>
               {metaLine && (
-                <div className="text-[14px] text-muted mt-0.5 font-light">
+                <div className="text-[14px] text-slate-500 dark:text-slate-400 mt-0.5 font-light">
                   {metaLine}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Top grid: video + tracker */}
+          {/* Top: video (wider) + LiveTracker */}
           <div
-            className="grid grid-cols-[2fr_1fr] gap-4 items-stretch shrink-0"
-            style={{
-              gridTemplateColumns: "minmax(0, 2fr) minmax(220px, 320px)",
-            }}
+            className="grid gap-4 items-stretch shrink-0"
+            style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(200px, 280px)" }}
           >
-            {/* Video */}
-            <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col">
+            {/* Video player */}
+            <div className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-2xl overflow-hidden flex flex-col">
               <div className="relative w-full aspect-video bg-[#04080d] flex items-center justify-center cursor-pointer group">
                 {urls.annotatedVideo || urls.originalVideo ? (
                   <video
@@ -373,19 +366,15 @@ export default function AnalysisPage() {
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-primary/10 border-[1.5px] border-primary/30 flex items-center justify-center opacity-65 transition-opacity group-hover:opacity-100">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path
-                        d="M5 3l9 5-9 5V3z"
-                        fill="currentColor"
-                        className="text-primary"
-                      />
+                      <path d="M5 3l9 5-9 5V3z" fill="currentColor" className="text-primary" />
                     </svg>
                   </div>
                 )}
-                <span className="absolute top-3 left-4 text-[11px] text-muted font-light pointer-events-none">
+                <span className="absolute top-3 left-4 text-[11px] text-slate-400 dark:text-slate-500 font-light pointer-events-none">
                   {docData.title ?? videoId}
                 </span>
                 {duration > 0 && (
-                  <span className="absolute top-3 right-4 text-[11px] text-muted pointer-events-none">
+                  <span className="absolute top-3 right-4 text-[11px] text-slate-400 dark:text-slate-500 pointer-events-none">
                     {fmtTime(duration)}
                   </span>
                 )}
@@ -402,7 +391,7 @@ export default function AnalysisPage() {
                         className={`text-[10px] font-medium py-1 px-2.5 rounded-lg border cursor-pointer transition-all ${
                           ov[k]
                             ? "bg-primary/15 border-primary/40 text-primary"
-                            : "border-primary/20 bg-[#080c10]/80 text-muted"
+                            : "border-primary/20 bg-[#080c10]/80 text-slate-400 dark:text-slate-500"
                         }`}
                       >
                         {k.charAt(0).toUpperCase() + k.slice(1)}
@@ -411,8 +400,9 @@ export default function AnalysisPage() {
                   </div>
                 )}
               </div>
+
               {/* Timeline */}
-              <div className="p-4 px-5 pb-5 border-t border-border">
+              <div className="p-4 px-5 pb-5 border-t border-slate-200 dark:border-border">
                 <div
                   className="relative h-8 flex items-center cursor-pointer select-none"
                   ref={tlRef}
@@ -424,20 +414,14 @@ export default function AnalysisPage() {
                       style={{ width: `${pct * 100}%` }}
                     />
                   </div>
-                  {/* Shot markers */}
                   {shotEvents.map((ev, i) => {
-                    const evPct =
-                      duration > 0 ? (ev.frame / 30 / duration) * 100 : 0;
+                    const evPct = duration > 0 ? (ev.frame / 30 / duration) * 100 : 0;
                     const c = shotColor(ev.type);
                     return (
                       <div
                         key={i}
                         className="absolute -translate-x-1/2 w-[6px] h-[6px] rounded-full border border-[#080c10] transition-transform hover:scale-[1.8]"
-                        style={{
-                          left: `${evPct}%`,
-                          background: c,
-                          boxShadow: `0 0 8px ${c}80`,
-                        }}
+                        style={{ left: `${evPct}%`, background: c, boxShadow: `0 0 8px ${c}80` }}
                       />
                     );
                   })}
@@ -450,286 +434,183 @@ export default function AnalysisPage() {
                   <span className="text-[12px] text-primary font-semibold tabular-nums">
                     {fmtTime(currentTime)}
                   </span>
-                  <span className="text-[12px] text-muted font-light tabular-nums">
+                  <span className="text-[12px] text-slate-500 dark:text-slate-400 font-light tabular-nums">
                     {fmtTime(duration)}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Tracker canvas */}
-            <div className="bg-surface border border-border rounded-2xl flex flex-col overflow-hidden">
-              <div className="py-2.5 px-4 border-b border-border flex items-center justify-between shrink-0">
-                <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-muted">
-                  Live tracker
-                </span>
+            <LiveTracker analysisData={analysisData} currentTime={currentTime} />
+          </div>
+
+          {/* Always-visible stats row */}
+          <div className="grid grid-cols-3 gap-4 shrink-0">
+            {/* Shot breakdown with bar chart */}
+            <div className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-2xl p-5">
+              <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-1">
+                Shot breakdown
               </div>
-              <div className="flex-1 flex flex-col items-center justify-center p-6 gap-2">
-                <div className="text-[11px] text-muted/50 font-medium text-center">
-                  Tracking data available
-                  <br />
-                  after analysis completes
+              <div className="text-[28px] font-bold tracking-[-1px] leading-none text-primary mb-4">
+                {docData.totalShots ?? "—"}
+              </div>
+              {analysisData?.summary.shotCounts &&
+                Object.keys(analysisData.summary.shotCounts).length > 0 ? (
+                <div className="flex flex-col gap-2.5">
+                  {Object.entries(analysisData.summary.shotCounts)
+                    .sort(([, a], [, b]) => (b as number) - (a as number))
+                    .map(([type, count]) => {
+                      const pct = docData.totalShots
+                        ? ((count as number) / docData.totalShots) * 100
+                        : 0;
+                      return (
+                        <div key={type}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: shotColor(type) }} />
+                              {type}
+                            </span>
+                            <span className="text-[11px] font-bold tabular-nums">{count as number}</span>
+                          </div>
+                          <div className="h-1 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%`, background: shotColor(type) }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-[12px] text-slate-400 dark:text-slate-500">
+                  {status === "done" ? "No shot data" : "Processing…"}
+                </div>
+              )}
+            </div>
+
+            {/* Match metrics */}
+            <div className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-2xl p-5">
+              <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-4">
+                Match
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Duration</div>
+                  <div className="text-[22px] font-bold tracking-[-0.5px]">
+                    {duration ? fmtTime(duration) : "—"}
+                  </div>
+                </div>
+                <div className="h-px bg-slate-100 dark:bg-border" />
+                <div>
+                  <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Total shots</div>
+                  <div className="text-[22px] font-bold tracking-[-0.5px] text-primary">
+                    {docData.totalShots ?? "—"}
+                  </div>
+                </div>
+                <div className="h-px bg-slate-100 dark:bg-border" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Court</div>
+                    <div className={`text-[13px] font-bold ${analysisData?.geometry?.court_keypoints_6 ? "text-primary" : "text-slate-400 dark:text-slate-500"}`}>
+                      {analysisData?.geometry?.court_keypoints_6 ? "✓ Detected" : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Resolution</div>
+                    <div className="text-[13px] font-bold">
+                      {analysisData?.summary.resolution?.join("×") ?? "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tracking stats */}
+            <div className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-2xl p-5">
+              <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-4">
+                Tracking
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Shuttle visibility</div>
+                  <div className="text-[22px] font-bold tracking-[-0.5px] text-primary">
+                    {shuttleVisibility ? `${shuttleVisibility.pct}%` : "—"}
+                  </div>
+                  {shuttleVisibility && (
+                    <div className="mt-2 h-1.5 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${shuttleVisibility.pct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="h-px bg-slate-100 dark:bg-border" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Detected</div>
+                    <div className="text-[18px] font-bold text-primary">
+                      {shuttleVisibility?.detected ?? "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 mb-1">Frames</div>
+                    <div className="text-[18px] font-bold">
+                      {shuttleVisibility?.total ?? "—"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom views */}
-          <div className="grid grid-cols-1 gap-4">
-            {activeView === "overlay" && (
-              <div className="grid grid-cols-[1fr_1fr_2fr] gap-4">
-                <div className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-2">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted">
-                    Total shots
-                  </div>
-                  <div className="text-[28px] font-bold tracking-[-1px] leading-none text-primary">
-                    {docData.totalShots ?? "—"}
-                  </div>
-                  {analysisData?.summary.shotCounts &&
-                    Object.keys(analysisData.summary.shotCounts).length > 0 && (
-                      <div className="mt-1 flex flex-col gap-1.5">
-                        {Object.entries(analysisData.summary.shotCounts).map(
-                          ([type, count]) => (
-                            <div key={type} className="flex items-center gap-2">
-                              <div
-                                className="w-1.5 h-1.5 rounded-full shrink-0"
-                                style={{ background: shotColor(type) }}
-                              />
-                              <span className="text-[11px] text-muted">
-                                {type}
-                              </span>
-                              <span className="text-[11px] font-bold ml-auto tabular-nums">
-                                {count}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    )}
-                </div>
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-2">
-                    Duration
-                  </div>
-                  <div className="text-[28px] font-bold tracking-[-1px] leading-none">
-                    {duration ? fmtTime(duration) : "—"}
-                  </div>
-                  <div className="text-[11px] text-muted/60 mt-2 font-medium">
-                    mm:ss
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col">
-                  <div className="py-2.5 px-5 border-b border-border flex items-center justify-between shrink-0">
-                    <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-muted">
-                      Shot log
+          {/* Shot log — always visible, full width */}
+          <div className="bg-white dark:bg-card border border-slate-200 dark:border-border rounded-2xl overflow-hidden flex flex-col">
+            <div className="py-2.5 px-5 border-b border-slate-200 dark:border-border flex items-center justify-between shrink-0">
+              <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-slate-500 dark:text-slate-400">
+                Shot Log
+              </span>
+              <span className="text-[11px] text-primary font-bold">
+                {shotEvents.length} events detected
+              </span>
+            </div>
+            <div className="overflow-y-auto max-h-[280px] [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-primary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+              {shotEvents.length > 0 ? (
+                shotEvents.map((ev, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-6 py-3 px-6 border-b border-slate-100 dark:border-border/40 cursor-pointer transition-colors hover:bg-primary/5 group"
+                    onClick={() => {
+                      if (videoRef.current) videoRef.current.currentTime = ev.frame / 30;
+                    }}
+                  >
+                    <span className="text-[12px] text-primary font-bold w-12 shrink-0 tabular-nums">
+                      {fmtTime(ev.frame / 30)}
                     </span>
-                  </div>
-                  <div className="max-h-[160px] overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-primary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-                    {shotEvents.length > 0 ? (
-                      shotEvents.map((ev, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-4 py-2.5 px-5 border-b border-border/40 cursor-default transition-colors hover:bg-primary/5 group"
-                        >
-                          <span className="text-[12px] text-primary font-bold w-10 shrink-0 tabular-nums">
-                            {fmtTime(ev.frame / 30)}
-                          </span>
-                          <div
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{
-                              background: shotColor(ev.type),
-                              boxShadow: `0 0 5px ${shotColor(ev.type)}`,
-                            }}
-                          />
-                          <span className="text-[13.5px] text-foreground font-medium">
-                            {ev.type}
-                          </span>
-                          {ev.location_m && (
-                            <span className="text-[11px] text-muted ml-auto font-light">
-                              {ev.location_m[0].toFixed(1)},
-                              {ev.location_m[1].toFixed(1)}m
-                            </span>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex items-center justify-center p-8 text-[14px] text-muted">
-                        {status === "done"
-                          ? "No shots detected"
-                          : "Processing…"}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeView === "metrics" && (
-              <div className="grid grid-cols-[1fr_1fr_2fr] gap-4">
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-4">
-                    Match
-                  </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[13px] text-muted">Duration</span>
-                    <span className="text-[18px] font-bold">
-                      {duration ? fmtTime(duration) : "—"}
-                    </span>
-                  </div>
-                  <div className="h-1 bg-primary/10 rounded-full overflow-hidden mb-3">
                     <div
-                      className="h-full bg-primary"
-                      style={{ width: "100%" }}
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: shotColor(ev.type), boxShadow: `0 0 8px ${shotColor(ev.type)}` }}
                     />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-muted">Shots</span>
-                    <span className="text-[18px] font-bold text-primary">
-                      {docData.totalShots ?? "—"}
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-4">
-                    Shuttle
-                  </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[13px] text-muted">Detected</span>
-                    <span className="text-[18px] font-bold text-primary">
-                      {analysisData?.shuttle_debug?.filter(
-                        (s) => s.pos !== null,
-                      ).length ?? "—"}
-                    </span>
-                  </div>
-                  <div className="h-1 bg-primary/10 rounded-full overflow-hidden mb-3">
-                    <div
-                      className="h-full bg-primary"
-                      style={{ width: "65%" }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-muted">Frames</span>
-                    <span className="text-[18px] font-bold">
-                      {analysisData?.shuttle_debug?.length ?? "—"}
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-4">
-                    Court
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-0.5">
-                      <div className="text-[12px] text-muted font-light">
-                        Detection
-                      </div>
-                      <div className="text-[15px] font-bold text-primary">
-                        {analysisData?.geometry?.court_keypoints_6
-                          ? "✓ Success"
-                          : "—"}
-                      </div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[12px] text-muted font-light">
-                        Resolution
-                      </div>
-                      <div className="text-[15px] font-bold">
-                        {analysisData?.summary.resolution?.join(" × ") ?? "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeView === "shots" && (
-              <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col">
-                <div className="py-2.5 px-5 border-b border-border flex items-center justify-between shrink-0">
-                  <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-muted">
-                    Detailed Shot Log
-                  </span>
-                  <span className="text-[11px] text-primary font-bold">
-                    {shotEvents.length} events detected
-                  </span>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-primary/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-                  {shotEvents.length > 0 ? (
-                    shotEvents.map((ev, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-6 py-3 px-6 border-b border-border/40 cursor-default transition-colors hover:bg-primary/5 group"
-                      >
-                        <span className="text-[13px] text-primary font-bold w-12 shrink-0 tabular-nums">
-                          {fmtTime(ev.frame / 30)}
-                        </span>
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{
-                            background: shotColor(ev.type),
-                            boxShadow: `0 0 8px ${shotColor(ev.type)}`,
-                          }}
-                        />
-                        <div className="flex-1">
-                          <div className="text-[15px] text-foreground font-semibold">
-                            {ev.type}
-                          </div>
-                          {ev.location_m && (
-                            <div className="text-[11px] text-muted/60 mt-0.5 font-light">
-                              Coordinates: {ev.location_m[0].toFixed(2)}m,{" "}
-                              {ev.location_m[1].toFixed(2)}m
-                            </div>
-                          )}
+                    <div className="flex-1">
+                      <div className="text-[14px] text-foreground font-semibold">{ev.type}</div>
+                      {ev.location_m && (
+                        <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-light">
+                          {ev.location_m[0].toFixed(2)}m, {ev.location_m[1].toFixed(2)}m
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex items-center justify-center p-12 text-[14px] text-muted">
-                      No shots detected in this video analysis.
+                      )}
                     </div>
-                  )}
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity font-medium">
+                      seek →
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center p-12 text-[14px] text-slate-500 dark:text-slate-400">
+                  {status === "done" ? "No shots detected" : "Processing…"}
                 </div>
-              </div>
-            )}
-
-            {activeView === "tracker" && (
-              <div className="grid grid-cols-[1fr_1fr_2fr] gap-4">
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-2">
-                    P1 position
-                  </div>
-                  <div className="text-[18px] font-bold text-primary">
-                    Near side
-                  </div>
-                  <div className="text-[11px] text-muted/60 mt-1 font-light italic">
-                    estimated depth
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-2">
-                    P2 position
-                  </div>
-                  <div className="text-[18px] font-bold text-[#2c7da0]">
-                    Far side
-                  </div>
-                  <div className="text-[11px] text-muted/60 mt-1 font-light italic">
-                    estimated depth
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl p-5">
-                  <div className="text-[10px] font-bold tracking-[1px] uppercase text-muted mb-2">
-                    Tracking Confidence
-                  </div>
-                  <div className="text-[28px] font-bold tracking-[-1px] leading-none text-primary">
-                    {analysisData?.shuttle_debug
-                      ? `${Math.round((analysisData.shuttle_debug.filter((s) => s.pos !== null).length / analysisData.shuttle_debug.length) * 100)}%`
-                      : "—"}
-                  </div>
-                  <div className="text-[11px] text-muted/60 mt-2 font-medium">
-                    shuttle visibility score
-                  </div>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </>
       )}

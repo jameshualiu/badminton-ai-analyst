@@ -55,7 +55,6 @@ function timeAgo(ts: Timestamp | undefined): string {
   return `${d} day${d > 1 ? "s" : ""} ago`;
 }
 
-// Mini court SVG lines for card thumbnails
 function MiniCourt() {
   return (
     <svg
@@ -63,63 +62,14 @@ function MiniCourt() {
       height="100%"
       viewBox="0 0 160 90"
       preserveAspectRatio="xMidYMid meet"
-      className="absolute inset-0 opacity-80"
+      className="absolute inset-0"
     >
-      <rect
-        x="6"
-        y="5"
-        width="148"
-        height="80"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="0.6"
-        className="text-primary/20"
-      />
-      <line
-        x1="6"
-        y1="45"
-        x2="154"
-        y2="45"
-        stroke="currentColor"
-        strokeWidth="0.9"
-        className="text-primary/40"
-      />
-      <line
-        x1="6"
-        y1="22"
-        x2="154"
-        y2="22"
-        stroke="currentColor"
-        strokeWidth="0.5"
-        className="text-primary/12"
-      />
-      <line
-        x1="6"
-        y1="68"
-        x2="154"
-        y2="68"
-        stroke="currentColor"
-        strokeWidth="0.5"
-        className="text-primary/12"
-      />
-      <line
-        x1="80"
-        y1="5"
-        x2="80"
-        y2="22"
-        stroke="currentColor"
-        strokeWidth="0.5"
-        className="text-primary/12"
-      />
-      <line
-        x1="80"
-        y1="68"
-        x2="80"
-        y2="85"
-        stroke="currentColor"
-        strokeWidth="0.5"
-        className="text-primary/12"
-      />
+      <rect x="6" y="5" width="148" height="80" fill="none" stroke="currentColor" strokeWidth="0.6" className="text-primary/20" />
+      <line x1="6" y1="45" x2="154" y2="45" stroke="currentColor" strokeWidth="0.9" className="text-primary/40" />
+      <line x1="6" y1="22" x2="154" y2="22" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
+      <line x1="6" y1="68" x2="154" y2="68" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
+      <line x1="80" y1="5" x2="80" y2="22" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
+      <line x1="80" y1="68" x2="80" y2="85" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
     </svg>
   );
 }
@@ -141,7 +91,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-
     const q = query(
       collection(db, "users", user.uid, "videos"),
       orderBy("createdAt", "desc"),
@@ -149,15 +98,10 @@ export default function DashboardPage() {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setDocs(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() })) as RawVideoDoc[],
-        );
+        setDocs(snap.docs.map((d) => ({ id: d.id, ...d.data() })) as RawVideoDoc[]);
         setLoading(false);
       },
-      (err) => {
-        console.error(err);
-        setLoading(false);
-      },
+      (err) => { console.error(err); setLoading(false); },
     );
     return () => unsub();
   }, [user]);
@@ -171,9 +115,13 @@ export default function DashboardPage() {
     return { total, shots, minutes: Math.round(minutes), avgShots };
   }, [docs]);
 
-  const handleUpload = async (
-    file: File,
-  ): Promise<Result<{ videoId: string }, ApiError>> => {
+  const statusCounts = useMemo(() => ({
+    done: docs.filter(d => d.status === "done").length,
+    running: docs.filter(d => d.status === "running").length,
+    queued: docs.filter(d => !d.status || d.status === "queued").length,
+  }), [docs]);
+
+  const handleUpload = async (file: File): Promise<Result<{ videoId: string }, ApiError>> => {
     if (!user) return { ok: false, error: new ApiError("Not signed in", 401) };
     const token = await user.getIdToken();
     return createAndUploadVideo(file, token);
@@ -193,35 +141,24 @@ export default function DashboardPage() {
   };
 
   const dotColor = (status: VideoStatus | undefined) =>
-    status === "done"
-      ? "#89c2d9"
-      : status === "failed"
-        ? "rgba(200,80,80,0.65)"
-        : "rgba(169,214,229,0.35)";
+    status === "done" ? "#2563EB" : status === "failed" ? "rgba(200,80,80,0.65)" : "rgba(37,99,235,0.25)";
 
   const statusLabel = (s: VideoStatus | undefined) =>
-    s === "done"
-      ? "Done"
-      : s === "failed"
-        ? "Failed"
-        : s === "running"
-          ? "Processing"
-          : "Queued";
+    s === "done" ? "Done" : s === "failed" ? "Failed" : s === "running" ? "Processing" : "Queued";
 
   const statusBadgeClass = (s: VideoStatus | undefined) => {
-    if (s === "done") return "bg-primary/13 text-primary";
+    if (s === "done") return "bg-primary/10 text-primary";
     if (s === "failed") return "bg-red-500/10 text-red-400/80";
-    return "bg-foreground/6 text-muted";
+    return "bg-foreground/6 text-muted-foreground";
   };
 
   return (
-    <main className="flex flex-1 flex-col gap-6 min-w-0 p-8 max-w-[1400px]">
+    <main className="flex flex-1 flex-col gap-6 min-w-0 p-8 max-w-[1400px] mx-auto w-full">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[24px] font-semibold tracking-[-0.6px]">
-            Your analyses
-          </div>
-          <div className="mt-0.5 text-[14px] font-light text-muted">
+          <div className="text-[24px] font-semibold tracking-[-0.6px]">Your analyses</div>
+          <div className="mt-0.5 text-[14px] font-light text-slate-500 dark:text-slate-400">
             Upload a match clip to get started
           </div>
         </div>
@@ -230,13 +167,7 @@ export default function DashboardPage() {
           onClick={() => setUploadOpen(true)}
         >
           <svg width="12" height="12" viewBox="0 0 11 11" fill="none">
-            <path
-              d="M5.5 1v7M3 3.5l2.5-2.5L8 3.5M1 9.5h9"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M5.5 1v7M3 3.5l2.5-2.5L8 3.5M1 9.5h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Upload video
         </button>
@@ -244,194 +175,170 @@ export default function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        {[
-          {
-            label: "Analyses",
-            val: stats.total,
-            sub: "total sessions",
-            color: true,
-          },
-          { label: "Shots tracked", val: stats.shots, sub: "all clips" },
-          {
-            label: "Minutes analysed",
-            val: stats.minutes,
-            unit: "m",
-            sub: "of footage",
-          },
-          {
-            label: "Avg shots",
-            val: stats.avgShots,
-            unit: "/clip",
-            sub: "per analysis",
-          },
-        ].map((s, i) => (
-          <div
-            key={i}
-            className="rounded-2xl border border-border bg-surface/50 p-4"
-          >
-            <div className="mb-1.5 text-[10px] font-bold tracking-[1.2px] uppercase text-muted">
-              {s.label}
-            </div>
-            <div className="text-[28px] font-bold tracking-[-0.8px] leading-tight">
-              {s.color ? <span className="text-primary">{s.val}</span> : s.val}
-              {s.unit && (
-                <span className="ml-0.5 text-[14px] text-muted font-normal">
-                  {s.unit}
+        {/* First card: enhanced with status breakdown */}
+        <div className="rounded-2xl border border-slate-200 dark:border-border bg-white dark:bg-card p-4">
+          <div className="mb-1.5 text-[10px] font-bold tracking-[1.2px] uppercase text-slate-400 dark:text-slate-500">
+            Analyses
+          </div>
+          <div className="text-[28px] font-bold tracking-[-0.8px] leading-tight">
+            <span className="text-primary">{stats.total}</span>
+          </div>
+          <div className="mt-1 mb-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">total sessions</div>
+          {stats.total > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {statusCounts.done > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {statusCounts.done} Done
+                </span>
+              )}
+              {statusCounts.running > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500">
+                  {statusCounts.running} Processing
+                </span>
+              )}
+              {statusCounts.queued > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400">
+                  {statusCounts.queued} Queued
                 </span>
               )}
             </div>
-            <div className="mt-1 text-[11px] text-primary/60 font-medium">
-              {s.sub}
+          )}
+        </div>
+        {/* Remaining stat cards */}
+        {[
+          { label: "Shots tracked", val: stats.shots, sub: "all clips" },
+          { label: "Minutes analysed", val: stats.minutes, unit: "m", sub: "of footage" },
+          { label: "Avg shots", val: stats.avgShots, unit: "/clip", sub: "per analysis" },
+        ].map((s, i) => (
+          <div key={i} className="rounded-2xl border border-slate-200 dark:border-border bg-white dark:bg-card p-4">
+            <div className="mb-1.5 text-[10px] font-bold tracking-[1.2px] uppercase text-slate-400 dark:text-slate-500">
+              {s.label}
             </div>
+            <div className="text-[28px] font-bold tracking-[-0.8px] leading-tight">
+              {s.val}
+              {s.unit && (
+                <span className="ml-0.5 text-[14px] text-slate-400 dark:text-slate-500 font-normal">{s.unit}</span>
+              )}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">{s.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Recent */}
-      <div>
-        <div className="mb-3 px-1 text-[10px] font-bold tracking-[1.4px] uppercase text-foreground/30">
-          Recent Analyses
-        </div>
-        {loading ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/20 p-12 text-center text-[14px] text-muted">
-            Loading your library…
+      {/* Main content: analyses left, activity feed right */}
+      <div className={`grid gap-6 items-start ${docs.length > 0 ? "grid-cols-[1fr_280px]" : "grid-cols-1"}`}>
+        {/* Left: Recent Analyses */}
+        <div>
+          <div className="mb-3 px-1 text-[10px] font-bold tracking-[1.4px] uppercase text-slate-400 dark:text-slate-500">
+            Recent Analyses
           </div>
-        ) : docs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/20 p-12 text-center text-[14px] text-muted">
-            No analyses yet — upload a match clip to get started.
-          </div>
-        ) : (
-          <div className="grid grid-cols-4 gap-4">
-            {docs.map((doc) => (
+          {loading ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-border bg-slate-50 dark:bg-white/5 p-12 text-center text-[14px] text-slate-500 dark:text-slate-400">
+              Loading your library…
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-border bg-slate-50 dark:bg-white/5 p-12 text-center text-[14px] text-slate-500 dark:text-slate-400">
+              No analyses yet — upload a match clip to get started.
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {docs.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="group cursor-pointer overflow-hidden rounded-xl border border-slate-200 dark:border-border bg-white dark:bg-card transition-all hover:border-primary/40 hover:shadow-md hover:shadow-slate-200/80 dark:hover:shadow-black/40"
+                  onClick={() => navigate(`/analysis/${doc.id}`)}
+                >
+                  <div className="relative flex aspect-video w-full items-center justify-center bg-[#0C2040] overflow-hidden">
+                    <div className={`transition-opacity duration-300 absolute inset-0 ${doc.status === "done" ? "opacity-80" : "opacity-25"}`}>
+                      <MiniCourt />
+                    </div>
+                    <span className={`absolute top-2 right-2 rounded-lg px-2 py-0.5 text-[9px] font-bold tracking-[0.4px] uppercase shadow-sm ${statusBadgeClass(doc.status)}`}>
+                      {statusLabel(doc.status)}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <div className="mb-0.5 truncate text-[13.5px] font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {doc.title ?? "Untitled"}
+                    </div>
+                    <div className="mb-2 text-[11.5px] font-light text-slate-500 dark:text-slate-400">
+                      {fmtDate(doc.createdAt)}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {fmtDuration(doc.duration)}
+                      </span>
+                      {doc.totalShots ? (
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                          </svg>
+                          {doc.totalShots} shots
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] font-medium text-red-400 transition-all hover:bg-red-500/20 hover:border-red-500/40"
+                        onClick={(e) => handleDelete(doc.id, e)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
               <div
-                key={doc.id}
-                className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-surface/40 transition-all hover:border-primary/40 hover:bg-surface/60 hover:shadow-xl hover:shadow-primary/5"
-                onClick={() => navigate(`/analysis/${doc.id}`)}
+                className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-transparent transition-all hover:border-primary/40 hover:bg-primary/5 group"
+                onClick={() => setUploadOpen(true)}
               >
-                <div className="relative flex aspect-video w-full items-center justify-center bg-[#04080d]">
-                  {doc.status === "done" && <MiniCourt />}
-                  <span
-                    className={`absolute top-2 right-2 rounded-lg px-2 py-0.5 text-[9px] font-bold tracking-[0.4px] uppercase shadow-sm ${statusBadgeClass(doc.status)}`}
-                  >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 dark:border-border group-hover:border-primary/40 text-lg font-light text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">
+                  +
+                </div>
+                <div className="text-[12px] font-medium text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">
+                  New analysis
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Activity feed */}
+        {docs.length > 0 && (
+          <div>
+            <div className="mb-3 px-1 text-[10px] font-bold tracking-[1.4px] uppercase text-slate-400 dark:text-slate-500">
+              Recent Activity
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-border bg-white dark:bg-card">
+              {docs.slice(0, 10).map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 border-b border-slate-100 dark:border-border/50 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer group"
+                  onClick={() => navigate(`/analysis/${doc.id}`)}
+                >
+                  <div
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: dotColor(doc.status), boxShadow: `0 0 6px ${dotColor(doc.status)}` }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12.5px] font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {doc.title ?? "Untitled"}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                      {timeAgo(doc.createdAt)}
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[9px] font-bold uppercase ${statusBadgeClass(doc.status)}`}>
                     {statusLabel(doc.status)}
                   </span>
                 </div>
-                <div className="p-3">
-                  <div className="mb-0.5 truncate text-[13.5px] font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {doc.title ?? "Untitled"}
-                  </div>
-                  <div className="mb-2 text-[11.5px] font-light text-muted">
-                    {fmtDate(doc.createdAt)}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-muted flex items-center gap-1">
-                      <svg
-                        className="w-2.5 h-2.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      {fmtDuration(doc.duration)}
-                    </span>
-                    {doc.totalShots ? (
-                      <span className="text-[11px] text-muted flex items-center gap-1">
-                        <svg
-                          className="w-2.5 h-2.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-                          />
-                        </svg>
-                        {doc.totalShots} shots
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-3 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] font-medium text-red-400 transition-all hover:bg-red-500/20 hover:border-red-500/40"
-                      onClick={(e) => handleDelete(doc.id, e)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div
-              className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-transparent transition-all hover:border-primary/40 hover:bg-primary/5 group"
-              onClick={() => setUploadOpen(true)}
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border group-hover:border-primary/40 text-lg font-light text-muted group-hover:text-primary transition-colors">
-                +
-              </div>
-              <div className="text-[12px] font-medium text-muted group-hover:text-primary transition-colors">
-                New analysis
-              </div>
+              ))}
             </div>
           </div>
         )}
       </div>
-
-      {/* Activity */}
-      {docs.length > 0 && (
-        <div className="max-w-[800px]">
-          <div className="mb-3 px-1 text-[10px] font-bold tracking-[1.4px] uppercase text-foreground/30">
-            Recent Activity
-          </div>
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface/30">
-            {docs.slice(0, 5).map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center gap-4 border-b border-border/40 px-5 py-3.5 transition-colors last:border-b-0 hover:bg-primary/5 group"
-              >
-                <div
-                  className="h-1.5 w-1.5 shrink-0 rounded-full shadow-[0_0_8px_currentColor]"
-                  style={{
-                    background: dotColor(doc.status),
-                    color: dotColor(doc.status),
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-medium text-foreground">
-                    {doc.title ?? "Untitled"}
-                    <span className="font-light text-muted ml-2">
-                      ·{" "}
-                      {doc.status === "done"
-                        ? "Analysis complete"
-                        : doc.status === "running"
-                          ? "Processing started"
-                          : doc.status === "failed"
-                            ? "Analysis failed"
-                            : "Queued"}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-muted/60">
-                    {timeAgo(doc.createdAt)}
-                  </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClass(doc.status)}`}
-                >
-                  {statusLabel(doc.status)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <UploadModal
         open={uploadOpen}

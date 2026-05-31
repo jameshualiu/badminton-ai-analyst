@@ -39,12 +39,13 @@ test_vids/
 "test vids/"
 test vids/
 
-worker/weights/
+worker/tests/
 worker/debug_files/
 worker/debug_hits_output/
 worker/debug_hits.py
 worker/scripts/
-
+ShuttleSet/
+docs/
 
 # IDEs
 .vscode/

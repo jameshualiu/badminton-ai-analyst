@@ -6,10 +6,12 @@ import DashboardPage from "./pages/DashboardPage";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import PrivateLayout from "./layouts/PrivateLayout";
 import AnalysisPage from "./pages/AnalysisPage";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 
-export default function App() {
+function ThemedApp() {
+  const { isDark } = useTheme();
   return (
-    <div className="theme-dark-blue min-h-screen bg-background text-foreground">
+    <div className={`theme-ai-saas min-h-screen bg-background text-foreground${isDark ? " dark" : ""}`}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<SignInPage />} />
@@ -29,5 +31,13 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   );
 }

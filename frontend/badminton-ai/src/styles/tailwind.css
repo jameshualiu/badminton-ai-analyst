@@ -223,6 +223,110 @@
   --glow-2: #be95c4;
 }
 
+/* Theme: AI SaaS — Lugia (icy blue-white, pearl, deep navy) */
+.theme-ai-saas {
+  --background: #F8F9FC;        /* soft off-white, barely cool */
+  --foreground: #0C1E33;        /* deep navy text */
+
+  --card: #ffffff;
+  --card-foreground: #0C1E33;
+
+  --popover: #ffffff;
+  --popover-foreground: #0C1E33;
+
+  --primary: #2563EB;           /* clear sky blue */
+  --primary-foreground: #ffffff;
+
+  --secondary: #C8DFF2;
+  --secondary-foreground: #0C1E33;
+
+  --muted: #C8DFF2;
+  --muted-foreground: #3E6389;  /* steel blue muted text */
+
+  --accent: #BFDBFE;            /* powder blue accent */
+  --accent-foreground: #1D4ED8;
+
+  --destructive: #EF4444;
+
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #2563EB;
+
+  --glow: #BAD9F5;              /* Lugia wing — soft blue glow */
+  --glow-2: #7FB8E8;            /* deeper wing blue */
+
+  --surface: rgba(255, 255, 255, 0.70);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0C1E33;
+  --sidebar-primary: #2563EB;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #F1F5F9;
+  --sidebar-accent-foreground: #0C1E33;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #2563EB;
+
+  --chart-1: oklch(0.55 0.18 240);
+  --chart-2: oklch(0.65 0.14 220);
+  --chart-3: oklch(0.75 0.10 200);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+}
+
+/* Theme: AI SaaS — dark variant — black + blue */
+.theme-ai-saas.dark {
+  --background: #07101A;        /* near-black, cool blue tint */
+  --foreground: #D8E8F5;
+
+  --card: #0C1A27;              /* slightly lighter black */
+  --card-foreground: #D8E8F5;
+
+  --popover: #0C1A27;
+  --popover-foreground: #D8E8F5;
+
+  --primary: #3B82F6;           /* blue stays bright */
+  --primary-foreground: #ffffff;
+
+  --secondary: #112030;
+  --secondary-foreground: #93C5FD;
+
+  --muted: #112030;
+  --muted-foreground: #5A9EC9;
+
+  --accent: #112030;
+  --accent-foreground: #93C5FD;
+
+  --destructive: #F87171;
+
+  --border: #142233;            /* dark blue border */
+  --input: #142233;
+  --ring: #3B82F6;
+
+  --glow: #3B82F6;
+  --glow-2: #1D4ED8;
+
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+
+  --sidebar: #07101A;
+  --sidebar-foreground: #D8E8F5;
+  --sidebar-primary: #3B82F6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #0C1A27;
+  --sidebar-accent-foreground: #D8E8F5;
+  --sidebar-border: #142233;
+  --sidebar-ring: #3B82F6;
+}
+
+/* Dot-grid background adapts to dark mode */
+.dot-grid {
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+}
+.dark .dot-grid {
+  background-image: radial-gradient(rgba(59, 130, 246, 0.18) 1px, transparent 1px);
+}
+
 /* shadcn base layer helpers */
 @layer base {
   * {
@@ -230,5 +334,12 @@
   }
   body {
     @apply bg-background text-foreground font-sans text-[14.5px];
+  }
+}
+
+/* Respect reduced-motion for dark mode toggle icons */
+@media (prefers-reduced-motion: reduce) {
+  .dark-toggle-icon {
+    transition: none !important;
   }
 }
