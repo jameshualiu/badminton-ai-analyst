@@ -49,7 +49,7 @@ export default function LandingPage() {
 
             {/* Navbar */}
             <nav className="sticky top-0 z-50 w-full bg-white/90 dark:bg-background/90 backdrop-blur-xl border-b border-slate-200 dark:border-border">
-                <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+                <div className="max-w-[1400px] mx-auto px-8 h-[70px] flex items-center justify-between">
                     <motion.div
                         className="flex items-center gap-2"
                         initial={{ opacity: 0, x: -16 }}

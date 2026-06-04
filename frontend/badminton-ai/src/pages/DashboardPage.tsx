@@ -153,7 +153,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="flex flex-1 flex-col gap-6 min-w-0 p-8 max-w-[1400px] mx-auto w-full">
+    <main className="flex flex-1 flex-col gap-6 min-w-0 p-8 max-w-[1500px] mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

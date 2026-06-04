@@ -135,28 +135,42 @@ export default function LiveTracker({ analysisData, currentTime }: Props) {
       ctx.stroke();
     };
 
-    // Court background
-    ctx.fillStyle = "rgba(15,28,40,0.92)";
+    // Outer dark surround
+    ctx.fillStyle = "rgba(10,20,32,0.95)";
     ctx.beginPath();
-    ctx.roundRect(cX - 4, cY - 4, cW + 8, cH + 8, 5);
+    ctx.roundRect(cX - 6, cY - 6, cW + 12, cH + 12, 6);
     ctx.fill();
 
-    const LINE  = "rgba(137,194,217,0.45)";
-    const LINE2 = "rgba(137,194,217,0.7)";
+    // Court surface (green)
+    ctx.fillStyle = "rgba(22,78,46,0.75)";
+    ctx.fillRect(cX, cY, cW, cH);
 
-    // Outer boundary
-    seg(0, 0, 1, 0, LINE2, 1.5); seg(1, 0, 1, 1, LINE2, 1.5);
-    seg(1, 1, 0, 1, LINE2, 1.5); seg(0, 1, 0, 0, LINE2, 1.5);
-    // Net
-    seg(0, L.net, 1, L.net, "rgba(137,194,217,0.85)", 2);
+    const LINE  = "rgba(255,255,255,0.55)";
+    const LINE2 = "rgba(255,255,255,0.85)";
+
+    // Outer doubles boundary
+    ctx.strokeStyle = LINE2;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cX, cY, cW, cH);
+
+    // Singles sidelines (run full length)
+    seg(L.sideL, 0, L.sideL, 1, LINE, 1);
+    seg(L.sideR, 0, L.sideR, 1, LINE, 1);
+
+    // Long service lines (doubles back lines)
+    seg(0, L.svcLd,  1, L.svcLd,  LINE, 1);
+    seg(0, L.svcLdb, 1, L.svcLdb, LINE, 1);
+
     // Short service lines
-    seg(0, L.svcS, 1, L.svcS, LINE); seg(0, L.svcSb, 1, L.svcSb, LINE);
-    // Long service lines
-    seg(0, L.svcLd, 1, L.svcLd, LINE); seg(0, L.svcLdb, 1, L.svcLdb, LINE);
-    // Singles sidelines
-    seg(L.sideL, 0, L.sideL, 1, LINE); seg(L.sideR, 0, L.sideR, 1, LINE);
-    // Centre service line
-    seg(L.cx, L.svcS, L.cx, L.svcSb, LINE);
+    seg(0, L.svcS,  1, L.svcS,  LINE, 1);
+    seg(0, L.svcSb, 1, L.svcSb, LINE, 1);
+
+    // Centre service lines — one per half, must NOT cross the net
+    seg(L.cx, L.svcLd,  L.cx, L.svcS,  LINE, 1); // top half
+    seg(L.cx, L.svcSb, L.cx, L.svcLdb, LINE, 1); // bottom half
+
+    // Net — drawn last so it sits on top
+    seg(0, L.net, 1, L.net, "rgba(255,255,255,0.95)", 2.5);
 
     if (!displayShots.length) {
       ctx.fillStyle = "rgba(137,194,217,0.2)";
@@ -269,20 +283,10 @@ export default function LiveTracker({ analysisData, currentTime }: Props) {
         <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-slate-500 dark:text-slate-400">
           Rally Map
         </span>
-        {hasData && (
-          <div className="flex items-center gap-3">
-            {rallyLen > 0 && (
-              <span className="text-[9px] text-primary font-semibold tabular-nums">
-                {rallyLen} shot{rallyLen !== 1 ? "s" : ""}
-              </span>
-            )}
-            {Object.entries(SHOT_COLORS).slice(0, 4).map(([type, color]) => (
-              <div key={type} className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                <span className="text-[8px] text-slate-400 dark:text-slate-500">{type}</span>
-              </div>
-            ))}
-          </div>
+        {rallyLen > 0 && (
+          <span className="text-[11px] text-primary font-bold tabular-nums">
+            {rallyLen} shot{rallyLen !== 1 ? "s" : ""}
+          </span>
         )}
       </div>
 

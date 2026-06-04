@@ -51,7 +51,7 @@ export default function SignInPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
 
       <header className="w-full border-b border-slate-200 dark:border-border bg-white/90 dark:bg-background/90 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-8 h-[70px] flex items-center justify-between">
           <button
             onClick={() => navigate("/")}
             className="cursor-pointer flex items-center gap-2 hover:opacity-80 transition-opacity"
