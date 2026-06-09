@@ -139,20 +139,21 @@ def process_badminton_video(data: dict):
         thumbnail_url = None
         try:
             from decord import VideoReader, cpu
-            import cv2, numpy as np
+            import cv2
+            import numpy as np
 
-            _vr = VideoReader(local_video, ctx=cpu(0), width=640, height=360)
-            _fps = _vr.get_avg_fps() or 25
-            _target_frame = min(int(_fps * 5), len(_vr) - 1)
-            _frame_rgb = _vr[_target_frame].asnumpy()
-            _frame_bgr = cv2.cvtColor(_frame_rgb, cv2.COLOR_RGB2BGR)
-            _ok, _buf = cv2.imencode('.jpg', _frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if _ok:
+            vr = VideoReader(local_video, ctx=cpu(0), width=640, height=360)
+            fps = vr.get_avg_fps() or 25  # 25 fps assumed if video reports 0 (malformed/fallback)
+            target_frame = min(int(fps * 5), len(vr) - 1)
+            frame_rgb = vr[target_frame].asnumpy()
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            ok, buf = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if ok:
                 thumb_key = f"outputs/{user_id}/{video_id}/thumbnail.jpg"
                 s3.put_object(
                     Bucket=bucket,
                     Key=thumb_key,
-                    Body=_buf.tobytes(),
+                    Body=buf.tobytes(),
                     ContentType='image/jpeg',
                 )
                 thumbnail_url = s3.generate_presigned_url(
@@ -163,8 +164,8 @@ def process_badminton_video(data: dict):
                 print(f"[thumb] Thumbnail uploaded: {thumb_key}")
             else:
                 print("[thumb] WARNING: cv2.imencode failed, skipping thumbnail")
-        except Exception as _e:
-            print(f"[thumb] WARNING: Thumbnail extraction failed (non-fatal): {_e}")
+        except Exception as e:
+            print(f"[thumb] WARNING: Thumbnail extraction failed (non-fatal): {e}")
 
         # Step 4: Run Analysis Pipeline
         print("[init] Initializing AI Engine...")
