@@ -25,6 +25,7 @@ type RawVideoDoc = {
   duration?: number | null;
   totalShots?: number | null;
   status?: VideoStatus;
+  thumbnailUrl?: string | null;
 };
 
 function fmtDuration(sec: number | null | undefined): string {
