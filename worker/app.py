@@ -7,8 +7,25 @@ from pathlib import Path
 app = modal.App("badminton-ai-worker")
 
 # 2. Define the GPU Environment (Container Image)
+# worker_image = (
+#     modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04", add_python="3.11")
+#     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
+#     .pip_install(
+#         "torch==2.2.2+cu121",
+#         "torchvision==0.17.2+cu121",
+#         extra_index_url="https://download.pytorch.org/whl/cu121",
+#     )
+#     .pip_install("onnxruntime==1.20.1")
+#     .pip_install_from_requirements("worker/requirements.txt")
+#     .add_local_python_source("worker/inference", "worker/pipeline", "worker/court_detector")
+# )
+
 worker_image = (
-    modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04", add_python="3.11")
+    modal.Image.from_registry(
+        "nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04",
+        add_python="3.11",
+        force_build=True
+    )
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
     .pip_install(
         "torch==2.2.2+cu121",
@@ -17,7 +34,7 @@ worker_image = (
     )
     .pip_install("onnxruntime==1.20.1")
     .pip_install_from_requirements("worker/requirements.txt")
-    .add_local_python_source("inference", "pipeline", "court_detector")
+    .add_local_dir("worker", remote_path="/root")
 )
 
 # 3. Create a Modal Volume for Persistent Model Storage
@@ -75,11 +92,11 @@ def process_badminton_video(data: dict):
     try:
         # Step 1: Status Update & Volume Check
         video_doc_ref.update({"status": "running"})
-        print(f"🔍 Diagnostic: Scanning Volume at {MODELS_DIR}")
+        print(f"[debug] Diagnostic: Scanning Volume at {MODELS_DIR}")
         
         # Build a map of what's actually in the volume (recursively)
         all_volume_files = {f.name: f for f in MODELS_DIR.glob("**/*") if f.is_file()}
-        print(f"📁 Volume contains: {list(all_volume_files.keys())}")
+        print(f"[volume] Volume contains: {list(all_volume_files.keys())}")
 
         # Step 2: Resolve Model Paths (Smart Search)
         model_targets = {
@@ -94,32 +111,63 @@ def process_badminton_video(data: dict):
         for key, filename in model_targets.items():
             if filename in all_volume_files:
                 resolved_paths[key] = str(all_volume_files[filename])
-                print(f"✅ Found {filename} in Volume at: {resolved_paths[key]}")
+                print(f"[OK] Found {filename} in Volume at: {resolved_paths[key]}")
             else:
                 # Backup: Try to download from R2 if missing from Volume
                 target_path = MODELS_DIR / filename
-                print(f"📡 {filename} missing from Volume. Attempting R2 download: models/{filename}")
+                print(f"[download] {filename} missing from Volume. Attempting R2 download: models/{filename}")
                 try:
                     s3.download_file(bucket, f"models/{filename}", str(target_path))
                     resolved_paths[key] = str(target_path)
-                    print(f"✅ Successfully recovered {filename} from R2")
+                    print(f"[OK] Successfully recovered {filename} from R2")
                 except Exception as e:
-                    print(f"❌ 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
+                    print(f"[ERROR] 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
                     raise e
 
         models_volume.commit()
 
         # Step 3: Download Raw Video
         local_video = f"/tmp/{video_id}.mp4"
-        print(f"🎬 Downloading video: {video_e2_key} from {bucket}")
+        print(f"[video] Downloading video: {video_e2_key} from {bucket}")
         try:
             s3.download_file(bucket, video_e2_key, local_video)
         except Exception as e:
-            print(f"❌ Video Download Error: {e}")
+            print(f"[ERROR] Video Download Error: {e}")
             raise e
         
+        # Step 3.5: Extract thumbnail
+        thumbnail_url = None
+        try:
+            from decord import VideoReader, cpu
+            import cv2, numpy as np
+
+            _vr = VideoReader(local_video, ctx=cpu(0), width=640, height=360)
+            _fps = _vr.get_avg_fps() or 25
+            _target_frame = min(int(_fps * 5), len(_vr) - 1)
+            _frame_rgb = _vr[_target_frame].asnumpy()
+            _frame_bgr = cv2.cvtColor(_frame_rgb, cv2.COLOR_RGB2BGR)
+            _ok, _buf = cv2.imencode('.jpg', _frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if _ok:
+                thumb_key = f"outputs/{user_id}/{video_id}/thumbnail.jpg"
+                s3.put_object(
+                    Bucket=bucket,
+                    Key=thumb_key,
+                    Body=_buf.tobytes(),
+                    ContentType='image/jpeg',
+                )
+                thumbnail_url = s3.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': bucket, 'Key': thumb_key},
+                    ExpiresIn=604800,  # 7 days
+                )
+                print(f"[thumb] Thumbnail uploaded: {thumb_key}")
+            else:
+                print("[thumb] WARNING: cv2.imencode failed, skipping thumbnail")
+        except Exception as _e:
+            print(f"[thumb] WARNING: Thumbnail extraction failed (non-fatal): {_e}")
+
         # Step 4: Run Analysis Pipeline
-        print("⚙️ Initializing AI Engine...")
+        print("[init] Initializing AI Engine...")
         inference = BadmintonInference(
             resolved_paths["tracknet"],
             resolved_paths["court_kprcnn"],
@@ -143,13 +191,14 @@ def process_badminton_video(data: dict):
             "status": "done",
             "duration": results["summary"]["durationSec"],
             "totalShots": results["summary"]["totalShots"],
-            "analysisJson": results_e2_key, 
+            "analysisJson": results_e2_key,
+            "thumbnailUrl": thumbnail_url,
             "updatedAt": firestore.SERVER_TIMESTAMP
         })
-        print(f"🎉 Processing Complete for {video_id}!")
+        print(f"[done] Processing Complete for {video_id}!")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         video_doc_ref.update({"status": "failed", "error": str(e)})
         raise e
 
