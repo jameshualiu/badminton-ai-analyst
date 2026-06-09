@@ -56,24 +56,6 @@ function timeAgo(ts: Timestamp | undefined): string {
   return `${d} day${d > 1 ? "s" : ""} ago`;
 }
 
-function MiniCourt() {
-  return (
-    <svg
-      width="100%"
-      height="100%"
-      viewBox="0 0 160 90"
-      preserveAspectRatio="xMidYMid meet"
-      className="absolute inset-0"
-    >
-      <rect x="6" y="5" width="148" height="80" fill="none" stroke="currentColor" strokeWidth="0.6" className="text-primary/20" />
-      <line x1="6" y1="45" x2="154" y2="45" stroke="currentColor" strokeWidth="0.9" className="text-primary/40" />
-      <line x1="6" y1="22" x2="154" y2="22" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
-      <line x1="6" y1="68" x2="154" y2="68" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
-      <line x1="80" y1="5" x2="80" y2="22" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
-      <line x1="80" y1="68" x2="80" y2="85" stroke="currentColor" strokeWidth="0.5" className="text-primary/12" />
-    </svg>
-  );
-}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -249,10 +231,27 @@ export default function DashboardPage() {
                   className="group cursor-pointer overflow-hidden rounded-xl border border-slate-200 dark:border-border bg-white dark:bg-card transition-all hover:border-primary/40 hover:shadow-md hover:shadow-slate-200/80 dark:hover:shadow-black/40"
                   onClick={() => navigate(`/analysis/${doc.id}`)}
                 >
-                  <div className="relative flex aspect-video w-full items-center justify-center bg-[#0C2040] overflow-hidden">
-                    <div className={`transition-opacity duration-300 absolute inset-0 ${doc.status === "done" ? "opacity-80" : "opacity-25"}`}>
-                      <MiniCourt />
-                    </div>
+                  <div className="relative flex aspect-video w-full overflow-hidden">
+                    {doc.thumbnailUrl ? (
+                      <>
+                        <img
+                          src={doc.thumbnailUrl}
+                          alt={doc.title ?? ""}
+                          className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-all duration-500"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-blue-500/[0.18]" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#07101A] via-[#07101A]/30 to-transparent" />
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0f2942] via-[#071828] to-[#07101A]">
+                        <div className="w-10 h-10 rounded-full border border-blue-500/30 flex items-center justify-center">
+                          <div className="w-0 h-0 border-t-[6px] border-b-[6px] border-l-[10px] border-t-transparent border-b-transparent border-l-blue-500/50 ml-0.5" />
+                        </div>
+                      </div>
+                    )}
                     <span className={`absolute top-2 right-2 rounded-lg px-2 py-0.5 text-[9px] font-bold tracking-[0.4px] uppercase shadow-sm ${statusBadgeClass(doc.status)}`}>
                       {statusLabel(doc.status)}
                     </span>
