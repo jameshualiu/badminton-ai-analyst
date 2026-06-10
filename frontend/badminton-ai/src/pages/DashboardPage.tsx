@@ -57,6 +57,33 @@ function timeAgo(ts: Timestamp | undefined): string {
 }
 
 
+function ThumbnailFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0f2942] via-[#071828] to-[#07101A]">
+      <div className="w-10 h-10 rounded-full border border-blue-500/30 flex items-center justify-center">
+        <div className="w-0 h-0 border-t-[6px] border-b-[6px] border-l-[10px] border-t-transparent border-b-transparent border-l-blue-500/50 ml-0.5" />
+      </div>
+    </div>
+  );
+}
+
+function VideoThumbnail({ url, title }: { url: string; title: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <ThumbnailFallback />;
+  return (
+    <>
+      <img
+        src={url}
+        alt={title}
+        className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-all duration-500"
+        onError={() => setBroken(true)}
+      />
+      <div className="absolute inset-0 bg-blue-500/[0.18]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#07101A] via-[#07101A]/30 to-transparent" />
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { uploadTrigger } = useOutletContext<{ uploadTrigger: number }>();
@@ -233,24 +260,9 @@ export default function DashboardPage() {
                 >
                   <div className="relative flex aspect-video w-full overflow-hidden">
                     {doc.thumbnailUrl ? (
-                      <>
-                        <img
-                          src={doc.thumbnailUrl}
-                          alt={doc.title ?? ""}
-                          className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-all duration-500"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-blue-500/[0.18]" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#07101A] via-[#07101A]/30 to-transparent" />
-                      </>
+                      <VideoThumbnail url={doc.thumbnailUrl} title={doc.title ?? ""} />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0f2942] via-[#071828] to-[#07101A]">
-                        <div className="w-10 h-10 rounded-full border border-blue-500/30 flex items-center justify-center">
-                          <div className="w-0 h-0 border-t-[6px] border-b-[6px] border-l-[10px] border-t-transparent border-b-transparent border-l-blue-500/50 ml-0.5" />
-                        </div>
-                      </div>
+                      <ThumbnailFallback />
                     )}
                     <span className={`absolute top-2 right-2 rounded-lg px-2 py-0.5 text-[9px] font-bold tracking-[0.4px] uppercase shadow-sm ${statusBadgeClass(doc.status)}`}>
                       {statusLabel(doc.status)}
