@@ -26,10 +26,10 @@ def list_e2_files():
     
     if 'Contents' in response:
         for obj in response['Contents']:
-            print(f"🔑 Key found: '{obj['Key']}'")
+            print(f"[key] Key found: '{obj['Key']}'")
     else:
         # Try listing with a broader prefix if not found
-        print(f"❌ No files found with prefix: {prefix}")
+        print(f"[ERROR] No files found with prefix: {prefix}")
         print("Trying broader prefix: uploads/FuHuYchBOwMrF0ohbejJQJr5kIP2/")
         res2 = s3.list_objects_v2(Bucket=bucket, Prefix="uploads/FuHuYchBOwMrF0ohbejJQJr5kIP2/")
         if 'Contents' in res2:

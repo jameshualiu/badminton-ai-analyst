@@ -12,7 +12,7 @@ def _load_model(weights_path: str, device: str):
 
 
 # ---------------------------------------------------------------------------
-# TrackNet architecture — required to load ball_track.pt (saved as state dict)
+# TrackNet architecture -- required to load ball_track.pt (saved as state dict)
 # ---------------------------------------------------------------------------
 
 class _Conv(nn.Module):
@@ -237,12 +237,15 @@ class YoloPoseAdapter:
     distributions match the classifier's expected input.
     Returns 17 COCO keypoints per detected person (score-filtered).
     """
-    SCORE_THRESHOLD = 0.5
+    # Low threshold on purpose: the far (top) player often scores < 0.35 on
+    # lower-quality footage. The pipeline's court filter provides precision;
+    # this threshold only needs to keep recall high.
+    SCORE_THRESHOLD = 0.05
 
     def __init__(self, weights_path: str):
         from ultralytics import YOLO
         self._model = YOLO(weights_path)
-        print(f"🤸 YoloPoseAdapter loaded: {weights_path}")
+        print(f"[yolo] YoloPoseAdapter loaded: {weights_path}")
 
     def detect_batch(self, frames: list) -> list:
         """
@@ -250,9 +253,9 @@ class YoloPoseAdapter:
             frames: list of HxWx3 uint8 numpy arrays
         Returns:
             list (one entry per frame) of player lists:
-            [[{"id": int, "skeleton": [[x,y]*17], "box": [x1,y1,x2,y2]}, ...], ...]
+            [[{"id": int, "skeleton": [[x,y]*17], "box": [x1,y1,x2,y2], "conf": float}, ...], ...]
         """
-        results = self._model(frames, verbose=False)
+        results = self._model(frames, verbose=False, conf=self.SCORE_THRESHOLD)
 
         output = []
         for result in results:
@@ -268,6 +271,7 @@ class YoloPoseAdapter:
                         "id": len(players),
                         "skeleton": kpts[i].tolist(),
                         "box": boxes[i].tolist(),
+                        "conf": float(confs[i]),
                     })
             output.append(players)
         return output
@@ -293,7 +297,7 @@ class TrackNetAdapter:
         Args:
             batch: (N, 9, 288, 512) float32 numpy array, values in [0, 1]
         Returns:
-            (N, 1, 288, 512) float32 numpy array — heatmap for the centre frame
+            (N, 1, 288, 512) float32 numpy array -- heatmap for the centre frame
         """
         tensor = torch.from_numpy(batch).to(self.device)
         with torch.no_grad():
@@ -304,12 +308,8 @@ class TrackNetAdapter:
 
 class ShotClassifierAdapter:
     # COCO 17 indices to keep: nose + shoulders/elbows/wrists + hips/knees/ankles (drops eyes/ears)
-    COCO_SUBSET = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    CLASSES = ["Clear", "Drive", "Drop", "Lob", "Net", "Smash"]
-
-    # Scale YOLO 512×288 keypoints to 1280×720 — the likely resolution of training videos
-    SCALE_X = 1280.0 / 512.0
-    SCALE_Y = 720.0  / 288.0
+    COCO_SUBSET = [15, 7, 11, 13, 5, 9, 0, 16, 8, 12, 14, 6, 10]
+    CLASSES = ["Clear", "Drive", "Drop", "Lob", "Net", "Smash", "UNKNOWN"]
 
     def __init__(self, weights_path: str):
         import onnxruntime as ort
@@ -319,24 +319,31 @@ class ShotClassifierAdapter:
         )
         self._input_name = self._session.get_inputs()[0].name
         out_shape = self._session.get_outputs()[0].shape
-        print(f"🎯 ShotClassifierAdapter loaded: {weights_path} | output shape={out_shape}")
+        print(f"[lstm] ShotClassifierAdapter loaded: {weights_path} | output shape={out_shape}")
 
     def classify(self, skeleton_sequence: list) -> str:
-        """
-        Args:
-            skeleton_sequence: list of T entries, each [[x,y]*13] or None for missing frames
-        Returns:
-            One of CLASSES
-        """
         T = len(skeleton_sequence)
         arr = np.zeros((1, T, 26), dtype=np.float32)
         for t, kps in enumerate(skeleton_sequence):
             if kps:
                 for k, (x, y) in enumerate(kps):
-                    arr[0, t, k * 2]     = x * self.SCALE_X
-                    arr[0, t, k * 2 + 1] = y * self.SCALE_Y
+                    # Normalize to 0-1 first (input is 512x288 pixels)
+                    # then apply float-to-int factor of 15 to match training
+                    arr[0, t, k * 2]     = (x / 512.0) * 15.0
+                    arr[0, t, k * 2 + 1] = (y / 288.0) * 15.0
+
+        # Per-sample normalization -- must match training exactly
+        max_val = np.max(arr)
+        if max_val > 0:
+            arr = arr / max_val
+
         probs = self._session.run(None, {self._input_name: arr})[0]
         idx = int(np.argmax(probs[0]))
-        label = self.CLASSES[idx] if idx < len(self.CLASSES) else f"Class{idx}"
-        print(f"[LSTM] probs={[round(v, 3) for v in probs[0].tolist()]} → {label}")
+        confidence = float(probs[0][idx])
+
+        if confidence < 0.25 or idx >= 6:
+            return "Unknown"
+
+        label = self.CLASSES[idx]
+        print(f"[LSTM] probs={[round(v, 3) for v in probs[0].tolist()]} conf={confidence:.2f} -> {label}")
         return label
