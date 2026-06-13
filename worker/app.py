@@ -34,7 +34,12 @@ worker_image = (
     )
     .pip_install("onnxruntime==1.20.1")
     .pip_install_from_requirements("worker/requirements.txt")
-    .add_local_dir("worker", remote_path="/root")
+    .add_local_dir(
+        "worker",
+        remote_path="/root",
+        # Weights come from the Modal volume; training data stays local
+        ignore=["weights/**", "train/features_v3/**", "**/__pycache__/**", ".pytest_cache/**"],
+    )
 )
 
 # 3. Create a Modal Volume for Persistent Model Storage
@@ -108,7 +113,16 @@ def process_badminton_video(data: dict):
         }
         resolved_paths = {}
 
-        for key, filename in model_targets.items():
+        # TrackNetV3 weights are optional: worker falls back to legacy TrackNet when absent
+        optional_targets = {
+            "tracknet_v3": "TrackNet_best.pt",
+            "inpaintnet": "InpaintNet_best.pt",
+            "hit_detector": "hit_detector_v3.onnx",
+            "bst": "bst_stroke_classifier.pt",
+        }
+
+        for key, filename in {**model_targets, **optional_targets}.items():
+            optional = key in optional_targets
             if filename in all_volume_files:
                 resolved_paths[key] = str(all_volume_files[filename])
                 print(f"[OK] Found {filename} in Volume at: {resolved_paths[key]}")
@@ -121,8 +135,12 @@ def process_badminton_video(data: dict):
                     resolved_paths[key] = str(target_path)
                     print(f"[OK] Successfully recovered {filename} from R2")
                 except Exception as e:
-                    print(f"[ERROR] 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
-                    raise e
+                    if optional:
+                        resolved_paths[key] = None
+                        print(f"[WARN] Optional model '{filename}' not found in Volume or R2; continuing without it")
+                    else:
+                        print(f"[ERROR] 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
+                        raise e
 
         models_volume.commit()
 
@@ -175,6 +193,10 @@ def process_badminton_video(data: dict):
             resolved_paths["net_kprcnn"],
             resolved_paths["yolo_pose"],
             lstm_path=resolved_paths.get("lstm"),
+            tracknet_v3_path=resolved_paths.get("tracknet_v3"),
+            inpaintnet_path=resolved_paths.get("inpaintnet"),
+            hit_detector_path=resolved_paths.get("hit_detector"),
+            bst_path=resolved_paths.get("bst"),
         )
         pipeline = BadmintonPipeline(inference)
         results = pipeline.process_video(local_video)
