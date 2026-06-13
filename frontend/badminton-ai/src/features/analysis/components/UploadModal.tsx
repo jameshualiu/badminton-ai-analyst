@@ -100,7 +100,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl bg-white dark:bg-card border border-slate-200 dark:border-border shadow-xl p-0 overflow-hidden gap-0">
+      <DialogContent className="sm:max-w-xl bg-white dark:bg-card border border-slate-200 dark:border-border shadow-xl p-0 overflow-hidden gap-0 rounded-xl">
 
         <DialogHeader className="px-6 py-5 border-b border-slate-200 dark:border-border">
           <DialogTitle className="text-[18px] font-semibold text-foreground flex items-center gap-2">

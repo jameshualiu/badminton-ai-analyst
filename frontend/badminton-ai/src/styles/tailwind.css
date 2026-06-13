@@ -68,7 +68,7 @@
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
 
-  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 /**
