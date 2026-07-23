@@ -1,16 +1,11 @@
-import { Timestamp, doc, onSnapshot } from "firebase/firestore";
+import type { Timestamp } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { db } from "../lib/firebase";
-import { useAuthUser } from "../auth/hooks/useAuthUser";
-import { shotColor, SHOT_COLORS } from "../utils/shotUtils";
+import { shotColor } from "../utils/shotUtils";
 import LiveTracker from "../features/analysis/components/LiveTracker";
-import type {
-  AnalysisData,
-  AnalysisShot,
-  TrackingFrame,
-  VideoStatus,
-} from "../features/analysis/types";
+import { ShotStatsTab } from "../features/analysis/components/ShotStatsTab";
+import { useAnalysisData } from "../features/analysis/hooks/useAnalysisData";
+import type { AnalysisShot, TrackingFrame } from "../features/analysis/types";
 
 const COCO_PAIRS: [number, number][] = [
   [0, 1], [0, 2], [1, 3], [2, 4], [5, 6], [5, 7], [7, 9],
@@ -18,25 +13,7 @@ const COCO_PAIRS: [number, number][] = [
   [13, 15], [12, 14], [14, 16],
 ];
 
-type FirestoreVideoDoc = {
-  title?: string;
-  status?: VideoStatus;
-  error?: string | null;
-  duration?: number | null;
-  totalShots?: number | null;
-  analysisJson?: string | null;
-  updatedAt?: Timestamp;
-  createdAt?: Timestamp;
-};
-
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
-
 const RALLY_GAP_SEC = 5;
-
-// Court SVG dimensions (matches the heatmap SVG)
-const SVG_COURT = { x: 16, y: 20, w: 98, h: 232 };
-const COURT_M = { w: 6.1, h: 13.4 };
 
 function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60),
@@ -53,14 +30,6 @@ function fmtDate(ts: Timestamp | undefined): string {
       day: "numeric",
       year: "numeric",
     });
-}
-
-// Maps location_m [x, y] → SVG coordinate
-function toSvgCoord(loc: [number, number]): { cx: number; cy: number } {
-  return {
-    cx: SVG_COURT.x + (loc[0] / COURT_M.w) * SVG_COURT.w,
-    cy: SVG_COURT.y + (loc[1] / COURT_M.h) * SVG_COURT.h,
-  };
 }
 
 function groupRallies(events: AnalysisShot[], fps: number): AnalysisShot[][] {
@@ -80,402 +49,10 @@ function groupRallies(events: AnalysisShot[], fps: number): AnalysisShot[][] {
   return groups.sort((a, b) => b.length - a.length); // longest first
 }
 
-// ─── Court heatmap SVG ────────────────────────────────────────────────────────
-function CourtHeatmap({
-  shots,
-  selectedType,
-}: {
-  shots: AnalysisShot[];
-  selectedType: string;
-}) {
-  const filtered = selectedType === "all"
-    ? shots
-    : shots.filter((s) => s.type === selectedType);
-
-  const positioned = filtered.filter((s) => s.location_m !== null) as (AnalysisShot & {
-    location_m: [number, number];
-  })[];
-
-  return (
-    <svg
-      viewBox="0 0 130 272"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-full block"
-      style={{ maxWidth: 160 }}
-    >
-      {/* Dark surround */}
-      <rect width="130" height="272" fill="rgba(8,16,28,0.9)" rx="4" />
-      {/* Court surface — green */}
-      <rect x="16" y="20" width="98" height="232" fill="rgba(22,78,46,0.8)" />
-
-      {/* Court lines */}
-      {/* Outer doubles boundary */}
-      <rect x="16" y="20" width="98" height="232" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.2" />
-      {/* Singles sidelines — full length */}
-      <line x1="23" y1="20" x2="23" y2="252" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      <line x1="107" y1="20" x2="107" y2="252" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      {/* Long service lines (doubles back) */}
-      <line x1="16" y1="32" x2="114" y2="32" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      <line x1="16" y1="240" x2="114" y2="240" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      {/* Short service lines */}
-      <line x1="16" y1="105" x2="114" y2="105" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      <line x1="16" y1="167" x2="114" y2="167" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      {/* Centre service lines — one per half, not crossing net */}
-      <line x1="65" y1="32" x2="65" y2="105" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      <line x1="65" y1="167" x2="65" y2="240" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
-      {/* Net — on top */}
-      <line x1="16" y1="136" x2="114" y2="136" stroke="rgba(255,255,255,0.95)" strokeWidth="2" />
-      <text x="117" y="139" fontSize="5.5" fill="rgba(255,255,255,0.3)" fontFamily="sans-serif">NET</text>
-
-      {/* Shot dots */}
-      {positioned.length === 0 && (
-        <text x="65" y="140" textAnchor="middle" fontSize="7" fill="rgba(255,255,255,0.2)" fontFamily="sans-serif">
-          no position data
-        </text>
-      )}
-      {positioned.map((s, i) => {
-        const { cx, cy } = toSvgCoord(s.location_m);
-        const color = shotColor(s.type);
-        const fade = selectedType === "all" ? 0.75 : 0.85;
-        return (
-          <circle
-            key={i}
-            cx={cx}
-            cy={cy}
-            r="3.5"
-            fill={color}
-            opacity={fade}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-// ─── Shot Stats tab ───────────────────────────────────────────────────────────
-function ShotStatsTab({
-  shotEvents,
-  totalShots,
-  status,
-}: {
-  shotEvents: AnalysisShot[];
-  totalShots: number | null | undefined;
-  status: string;
-}) {
-  const [selectedType, setSelectedType] = useState("all");
-
-  const shotTypes = useMemo(
-    () => Object.keys(SHOT_COLORS).filter((t) => t !== "Unknown"),
-    [],
-  );
-
-  const shotCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    shotEvents.forEach((s) => {
-      counts[s.type] = (counts[s.type] ?? 0) + 1;
-    });
-    return counts;
-  }, [shotEvents]);
-
-  const sortedTypes = useMemo(
-    () =>
-      Object.entries(shotCounts)
-        .sort(([, a], [, b]) => b - a)
-        .map(([t]) => t),
-    [shotCounts],
-  );
-
-  const maxCount = sortedTypes.length
-    ? (shotCounts[sortedTypes[0]] ?? 1)
-    : 1;
-
-  const transitions = useMemo(() => {
-    const map: Record<string, Record<string, number>> = {};
-    for (let i = 0; i < shotEvents.length - 1; i++) {
-      const from = shotEvents[i].type;
-      const to = shotEvents[i + 1].type;
-      if (!map[from]) map[from] = {};
-      map[from][to] = (map[from][to] ?? 0) + 1;
-    }
-    return map;
-  }, [shotEvents]);
-
-  const topTransitions = useMemo(() => {
-    return sortedTypes.slice(0, 4).map((from) => {
-      const toMap = transitions[from] ?? {};
-      const tos = Object.entries(toMap)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3);
-      const total = tos.reduce((s, [, n]) => s + n, 0);
-      return {
-        from,
-        tos: tos.map(([type, count]) => ({
-          type,
-          count,
-          pct: total > 0 ? Math.round((count / total) * 100) : 0,
-        })),
-      };
-    });
-  }, [sortedTypes, transitions]);
-
-  const empty = shotEvents.length === 0;
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Pill filter */}
-      <div className="flex flex-wrap gap-2">
-        {["all", ...shotTypes].map((type) => {
-          const active = selectedType === type;
-          const color = type === "all" ? "#3B82F6" : shotColor(type);
-          return (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className="px-3 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer"
-              style={
-                active
-                  ? {
-                      borderColor: color,
-                      color,
-                      background: `${color}18`,
-                    }
-                  : {
-                      borderColor: "rgba(255,255,255,0.10)",
-                      color: "rgba(147,197,253,0.55)",
-                      background: "transparent",
-                    }
-              }
-            >
-              {type === "all" ? "All shots" : type}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Heatmap + distribution */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Heatmap */}
-        <div className="dark:bg-card bg-white border border-border rounded-xl p-5">
-          <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-4">
-            Shot Heatmap
-          </div>
-          {empty ? (
-            <div className="text-[12px] text-slate-400 dark:text-slate-500">
-              {status === "done" ? "No position data" : "Processing…"}
-            </div>
-          ) : (
-            <div className="flex gap-4 items-start">
-              {/* SVG court */}
-              <div className="shrink-0 w-[130px]">
-                <CourtHeatmap shots={shotEvents} selectedType={selectedType} />
-              </div>
-              {/* Legend + bars */}
-              <div className="flex flex-col gap-2 flex-1 justify-center">
-                {sortedTypes.map((type) => {
-                  const count = shotCounts[type] ?? 0;
-                  const pct = totalShots ? (count / totalShots) * 100 : 0;
-                  const color = shotColor(type);
-                  const faded =
-                    selectedType !== "all" && selectedType !== type;
-                  return (
-                    <div
-                      key={type}
-                      className="flex items-center gap-2 transition-opacity"
-                      style={{ opacity: faded ? 0.22 : 1 }}
-                    >
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: color }}
-                      />
-                      <span
-                        className="text-[11px] font-medium w-9 shrink-0"
-                        style={{ color: "rgba(147,197,253,0.65)" }}
-                      >
-                        {type}
-                      </span>
-                      <div
-                        className="flex-1 h-1 rounded-full overflow-hidden"
-                        style={{ background: "rgba(255,255,255,0.06)" }}
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${(count / maxCount) * 100}%`,
-                            background: color,
-                          }}
-                        />
-                      </div>
-                      <span className="text-[12px] font-bold tabular-nums text-foreground w-5 text-right">
-                        {count}
-                      </span>
-                      <span
-                        className="text-[10px] tabular-nums w-8 text-right"
-                        style={{ color: "rgba(147,197,253,0.35)" }}
-                      >
-                        {Math.round(pct)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Shot count tiles + insight */}
-        <div className="dark:bg-card bg-white border border-border rounded-xl p-5">
-          <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-4">
-            Shot Breakdown
-          </div>
-          {empty ? (
-            <div className="text-[12px] text-slate-400 dark:text-slate-500">
-              {status === "done" ? "No data" : "Processing…"}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-3 gap-2 mb-1">
-                <div
-                  className="rounded-lg p-3"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-                >
-                  <div className="text-[9px] font-bold uppercase tracking-[.8px] text-slate-500 dark:text-slate-400 mb-1">
-                    Total
-                  </div>
-                  <div className="text-[22px] font-bold tracking-tight text-primary tabular-nums">
-                    {totalShots ?? "—"}
-                  </div>
-                </div>
-                <div
-                  className="rounded-lg p-3"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-                >
-                  <div className="text-[9px] font-bold uppercase tracking-[.8px] text-slate-500 dark:text-slate-400 mb-1">
-                    Top shot
-                  </div>
-                  <div
-                    className="text-[14px] font-bold"
-                    style={{ color: sortedTypes[0] ? shotColor(sortedTypes[0]) : undefined }}
-                  >
-                    {sortedTypes[0] ?? "—"}
-                  </div>
-                </div>
-                <div
-                  className="rounded-lg p-3"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-                >
-                  <div className="text-[9px] font-bold uppercase tracking-[.8px] text-slate-500 dark:text-slate-400 mb-1">
-                    Types
-                  </div>
-                  <div className="text-[22px] font-bold tracking-tight tabular-nums">
-                    {sortedTypes.length}
-                  </div>
-                </div>
-              </div>
-
-              {/* Per-type rows */}
-              <div className="flex flex-col gap-2.5 mt-1">
-                {sortedTypes.map((type) => {
-                  const count = shotCounts[type] ?? 0;
-                  const pct = totalShots ? (count / totalShots) * 100 : 0;
-                  const color = shotColor(type);
-                  const faded =
-                    selectedType !== "all" && selectedType !== type;
-                  return (
-                    <div
-                      key={type}
-                      className="transition-opacity"
-                      style={{ opacity: faded ? 0.22 : 1 }}
-                    >
-                      <div className="flex justify-between mb-1">
-                        <span className="text-[11px] flex items-center gap-1.5" style={{ color: "rgba(147,197,253,0.65)" }}>
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0 inline-block" style={{ background: color }} />
-                          {type}
-                        </span>
-                        <span className="text-[11px] font-bold tabular-nums">{count}</span>
-                      </div>
-                      <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%`, background: color }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Transition tendencies */}
-      {topTransitions.length > 0 && (
-        <div className="dark:bg-card bg-white border border-border rounded-xl p-5">
-          <div className="text-[10px] font-bold tracking-[1px] uppercase text-slate-500 dark:text-slate-400 mb-4">
-            Shot Transition Tendencies
-          </div>
-          <div className="grid grid-cols-2 gap-x-10 gap-y-0">
-            {topTransitions.map(({ from, tos }) => (
-              <div
-                key={from}
-                className="flex items-start gap-3 py-2.5 border-t border-border first:border-t-0"
-              >
-                <div className="flex items-center gap-1.5 w-14 shrink-0 pt-0.5">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: shotColor(from) }}
-                  />
-                  <span className="text-[11px] font-medium" style={{ color: "rgba(147,197,253,0.65)" }}>
-                    {from}
-                  </span>
-                </div>
-                <span className="text-[11px] pt-0.5" style={{ color: "rgba(147,197,253,0.3)" }}>→</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {tos.map(({ type, pct }, i) => (
-                    <span
-                      key={type}
-                      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold border"
-                      style={
-                        i === 0
-                          ? {
-                              background: `${shotColor(type)}12`,
-                              borderColor: `${shotColor(type)}35`,
-                              color: shotColor(type),
-                            }
-                          : {
-                              background: "rgba(255,255,255,0.03)",
-                              borderColor: "rgba(255,255,255,0.08)",
-                              color: "rgba(147,197,253,0.55)",
-                            }
-                      }
-                    >
-                      <span
-                        className="w-1 h-1 rounded-full"
-                        style={{ background: shotColor(type) }}
-                      />
-                      {type}
-                      <span style={{ color: "rgba(147,197,253,0.35)" }}>{pct}%</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
-  const { user } = useAuthUser();
-
-  const [docData, setDocData] = useState<FirestoreVideoDoc | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [urls, setUrls] = useState<Partial<Record<string, string>>>({});
-  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const { docData, loading, urls, analysisData, status } = useAnalysisData(videoId);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [ov, setOv] = useState({ court: true, pose: true, shuttle: true });
@@ -488,63 +65,6 @@ export default function AnalysisPage() {
   const animRef = useRef<number | null>(null);
   const shotLogRef = useRef<HTMLDivElement | null>(null);
   const activeRowRef = useRef<HTMLDivElement | null>(null);
-
-  // Firestore subscription
-  useEffect(() => {
-    if (!user || !videoId) return;
-    const ref = doc(db, "users", user.uid, "videos", videoId);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (snap.exists()) setDocData(snap.data() as FirestoreVideoDoc);
-        else setDocData(null);
-        setLoading(false);
-      },
-      (err) => {
-        console.error(err);
-        setLoading(false);
-      },
-    );
-    return () => unsub();
-  }, [user, videoId]);
-
-  const status = docData?.status ?? "queued";
-
-  // Fetch results
-  useEffect(() => {
-    if (!user || !videoId || !docData) return;
-    if (status !== "done" && status !== "running") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const token = await user.getIdToken();
-        const res = await fetch(`${API_BASE}/videos/${videoId}/results`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Failed to fetch results");
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.urls) {
-          setUrls(data.urls);
-          if (data.urls.analysisJson) {
-            try {
-              const jr = await fetch(data.urls.analysisJson);
-              if (!jr.ok) throw new Error("Failed to fetch JSON");
-              const json = await jr.json();
-              if (!cancelled) setAnalysisData(json);
-            } catch (e) {
-              console.error(e);
-            }
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, videoId, status]);
 
   const duration = docData?.duration ?? 0;
   const pct = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
@@ -837,7 +357,7 @@ export default function AnalysisPage() {
                           <div
                             key={i}
                             ref={isActive ? activeRowRef : null}
-                            className={`flex items-center gap-2 py-2 px-3 border-b border-border/40 cursor-pointer transition-colors ${
+                            className={`flex items-center gap-2 py-2 px-3 border-b border-slate-100 dark:border-border/40 cursor-pointer transition-colors ${
                               isActive
                                 ? "bg-primary/10 border-l-2 border-l-primary"
                                 : "hover:bg-primary/5"
@@ -1092,7 +612,7 @@ export default function AnalysisPage() {
                       return (
                         <div
                           key={i}
-                          className="flex items-center gap-4 px-5 py-3 border-b border-border/40 cursor-pointer hover:bg-primary/5 transition-colors"
+                          className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 dark:border-border/40 cursor-pointer hover:bg-primary/5 transition-colors"
                           style={isLong ? { borderLeft: "2px solid rgba(245,158,11,0.4)" } : {}}
                           onClick={() => {
                             if (videoRef.current) videoRef.current.currentTime = startSec;
