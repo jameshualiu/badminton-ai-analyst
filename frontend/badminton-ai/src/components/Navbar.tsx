@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { LogOut, Sun, Moon, Plus, ChevronDown, Sparkles } from "lucide-react";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
 import { logout } from "../auth/authActions";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../context/useTheme";
 
 interface NavbarProps {
   onUploadClick?: () => void;
