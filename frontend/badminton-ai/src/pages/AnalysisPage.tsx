@@ -2,9 +2,13 @@ import type { Timestamp } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { shotColor } from "../utils/shotUtils";
+import { fmtTime } from "../utils/timeUtils";
 import LiveTracker from "../features/analysis/components/LiveTracker";
+import { ShotLog } from "../features/analysis/components/ShotLog";
 import { ShotStatsTab } from "../features/analysis/components/ShotStatsTab";
+import { VideoTimeline } from "../features/analysis/components/VideoTimeline";
 import { useAnalysisData } from "../features/analysis/hooks/useAnalysisData";
+import { useCurrentTimeStore } from "../features/analysis/hooks/useCurrentTimeStore";
 import type { AnalysisShot, TrackingFrame } from "../features/analysis/types";
 
 const COCO_PAIRS: [number, number][] = [
@@ -14,12 +18,6 @@ const COCO_PAIRS: [number, number][] = [
 ];
 
 const RALLY_GAP_SEC = 5;
-
-function fmtTime(sec: number): string {
-  const m = Math.floor(sec / 60),
-    s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 function fmtDate(ts: Timestamp | undefined): string {
   if (!ts?.toDate) return "";
@@ -54,20 +52,16 @@ export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
   const { docData, loading, urls, analysisData, status } = useAnalysisData(videoId);
 
-  const [currentTime, setCurrentTime] = useState(0);
+  const timeStore = useCurrentTimeStore();
   const [ov, setOv] = useState({ court: true, pose: true, shuttle: true });
   const [activeTab, setActiveTab] = useState<"overview" | "shot-stats">("overview");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const renderOverlayRef = useRef<() => void>(() => {});
-  const tlRef = useRef<HTMLDivElement | null>(null);
   const animRef = useRef<number | null>(null);
-  const shotLogRef = useRef<HTMLDivElement | null>(null);
-  const activeRowRef = useRef<HTMLDivElement | null>(null);
 
   const duration = docData?.duration ?? 0;
-  const pct = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
 
   const trackingByFrame = useMemo(() => {
     const m = new Map<number, TrackingFrame>();
@@ -177,7 +171,7 @@ export default function AnalysisPage() {
     const v = videoRef.current;
     if (!v) return;
     const update = () => {
-      setCurrentTime(v.currentTime);
+      timeStore.set(v.currentTime);
       renderOverlayRef.current();
       animRef.current = requestAnimationFrame(update);
     };
@@ -185,7 +179,7 @@ export default function AnalysisPage() {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [urls]);
+  }, [urls, timeStore]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -200,24 +194,6 @@ export default function AnalysisPage() {
     handleResize();
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  const handleTlMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!tlRef.current || !videoRef.current || duration <= 0) return;
-    const seek = (clientX: number) => {
-      const rect = tlRef.current!.getBoundingClientRect();
-      const p = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
-      videoRef.current!.currentTime = p * duration;
-      setCurrentTime(p * duration);
-    };
-    seek(e.clientX);
-    const onMove = (ev: MouseEvent) => seek(ev.clientX);
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  };
 
   const toggleOv = (k: keyof typeof ov) =>
     setOv((prev) => ({ ...prev, [k]: !prev[k] }));
@@ -248,25 +224,6 @@ export default function AnalysisPage() {
     () => groupRallies(shotEvents, fps),
     [shotEvents, fps],
   );
-
-  // Index of the shot that was most recently hit at currentTime
-  const currentShotIdx = useMemo(() => {
-    if (!shotEvents.length || fps === 0) return -1;
-    const currentFrame = Math.round(currentTime * fps);
-    let idx = -1;
-    for (let i = 0; i < shotEvents.length; i++) {
-      if (shotEvents[i].frame <= currentFrame) idx = i;
-      else break;
-    }
-    return idx;
-  }, [shotEvents, currentTime, fps]);
-
-  // Auto-scroll shot log to the active row
-  useEffect(() => {
-    if (currentShotIdx >= 0 && activeRowRef.current && shotLogRef.current) {
-      activeRowRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [currentShotIdx]);
 
   const metaLine = [
     fmtDate(docData?.createdAt),
@@ -336,71 +293,13 @@ export default function AnalysisPage() {
                 }}
               >
                 {/* Shot log */}
-                <div className="dark:bg-card bg-white border border-border rounded-xl flex flex-col overflow-hidden">
-                  <div className="py-2.5 px-4 border-b border-border flex items-center justify-between shrink-0">
-                    <span className="text-[10px] font-bold tracking-[1.2px] uppercase text-slate-500 dark:text-slate-400">
-                      Shot Log
-                    </span>
-                    <span className="text-[11px] text-primary font-bold">
-                      {shotEvents.length}
-                    </span>
-                  </div>
-                  <div
-                    ref={shotLogRef}
-                    className="overflow-y-auto flex-1 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-primary/20 [&::-webkit-scrollbar-thumb]:rounded-full"
-                  >
-                    {shotEvents.length > 0 ? (
-                      shotEvents.map((ev, i) => {
-                        const isActive = i === currentShotIdx;
-                        const color = shotColor(ev.type);
-                        return (
-                          <div
-                            key={i}
-                            ref={isActive ? activeRowRef : null}
-                            className={`flex items-center gap-2 py-2 px-3 border-b border-slate-100 dark:border-border/40 cursor-pointer transition-colors ${
-                              isActive
-                                ? "bg-primary/10 border-l-2 border-l-primary"
-                                : "hover:bg-primary/5"
-                            }`}
-                            onClick={() => {
-                              if (videoRef.current)
-                                videoRef.current.currentTime = ev.frame / fps;
-                            }}
-                          >
-                            <span
-                              className={`text-[11px] font-bold w-8 shrink-0 tabular-nums ${isActive ? "text-primary" : "text-slate-500 dark:text-slate-400"}`}
-                            >
-                              {fmtTime(ev.frame / fps)}
-                            </span>
-                            <div
-                              className="w-1.5 h-1.5 rounded-full shrink-0 transition-transform"
-                              style={{
-                                background: color,
-                                boxShadow: isActive ? `0 0 6px ${color}` : "none",
-                                transform: isActive ? "scale(1.4)" : "scale(1)",
-                              }}
-                            />
-                            <span
-                              className={`text-[12px] font-semibold flex-1 truncate ${isActive ? "text-foreground" : "text-slate-500 dark:text-slate-400"}`}
-                              style={isActive ? { color } : undefined}
-                            >
-                              {ev.type}
-                            </span>
-                            {ev.location_m && (
-                              <span className="text-[9px] text-slate-400 dark:text-slate-500 tabular-nums">
-                                {ev.location_m[0].toFixed(1)},{ev.location_m[1].toFixed(1)}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="flex items-center justify-center p-8 text-[12px] text-slate-400 dark:text-slate-500">
-                        {status === "done" ? "No shots detected" : "Processing…"}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ShotLog
+                  shotEvents={shotEvents}
+                  fps={fps}
+                  videoRef={videoRef}
+                  status={status}
+                  store={timeStore}
+                />
 
                 {/* Video player */}
                 <div className="dark:bg-card bg-white border border-border rounded-xl overflow-hidden flex flex-col">
@@ -455,47 +354,17 @@ export default function AnalysisPage() {
                   </div>
 
                   {/* Timeline */}
-                  <div className="p-4 px-5 pb-5 border-t border-border shrink-0">
-                    <div
-                      className="relative h-8 flex items-center cursor-pointer select-none"
-                      ref={tlRef}
-                      onMouseDown={handleTlMouseDown}
-                    >
-                      <div className="w-full h-[3px] bg-primary/10 rounded-full">
-                        <div
-                          className="h-full bg-primary rounded-full"
-                          style={{ width: `${pct * 100}%` }}
-                        />
-                      </div>
-                      {shotEvents.map((ev, i) => {
-                        const evPct = duration > 0 ? (ev.frame / fps / duration) * 100 : 0;
-                        const c = shotColor(ev.type);
-                        return (
-                          <div
-                            key={i}
-                            className="absolute -translate-x-1/2 w-[6px] h-[6px] rounded-full border border-[#080c10] transition-transform hover:scale-[1.8]"
-                            style={{ left: `${evPct}%`, background: c, boxShadow: `0 0 8px ${c}80` }}
-                          />
-                        );
-                      })}
-                      <div
-                        className="absolute w-[13px] h-[13px] rounded-full bg-white border-2 border-primary -translate-x-1/2 pointer-events-none shadow-md"
-                        style={{ left: `${pct * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-2">
-                      <span className="text-[12px] text-primary font-semibold tabular-nums">
-                        {fmtTime(currentTime)}
-                      </span>
-                      <span className="text-[12px] text-slate-500 dark:text-slate-400 font-light tabular-nums">
-                        {fmtTime(duration)}
-                      </span>
-                    </div>
-                  </div>
+                  <VideoTimeline
+                    duration={duration}
+                    shotEvents={shotEvents}
+                    fps={fps}
+                    videoRef={videoRef}
+                    store={timeStore}
+                  />
                 </div>
 
                 {/* Live rally map */}
-                <LiveTracker analysisData={analysisData} currentTime={currentTime} />
+                <LiveTracker analysisData={analysisData} store={timeStore} />
               </div>
 
               {/* Tracking mini-stats row */}

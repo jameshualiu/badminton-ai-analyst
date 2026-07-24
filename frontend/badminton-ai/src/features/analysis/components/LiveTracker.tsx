@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useSyncExternalStore } from "react";
+import type { CurrentTimeStore } from "../hooks/useCurrentTimeStore";
 import type { AnalysisData, AnalysisShot } from "../types";
 
 type Props = {
   analysisData: AnalysisData | null;
-  currentTime: number;
+  store: CurrentTimeStore;
 };
 
 // Standard badminton court in normalised [0,1] — 6.1m wide × 13.4m long
@@ -51,7 +52,8 @@ function groupRallies(events: AnalysisShot[], fps: number): AnalysisShot[][] {
   return rallies;
 }
 
-export default function LiveTracker({ analysisData, currentTime }: Props) {
+export default function LiveTracker({ analysisData, store }: Props) {
+  const currentTime = useSyncExternalStore(store.subscribe, store.get);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 240, h: 300 });
