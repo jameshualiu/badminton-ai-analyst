@@ -2,6 +2,7 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { v4: uuidv4 } = require('uuid');
 const r2Client = require('../config/r2');
+const AppError = require('../utils/AppError');
 
 class VideoService {
   constructor(videoRepo) {
@@ -46,9 +47,9 @@ class VideoService {
   async getResultsUrls(userId, videoId) {
     // 1. Fetch the video document from the database
     const videoData = await this.repo.getVideo(userId, videoId);
-    
+
     if (!videoData) {
-      throw new Error("Video not found");
+      throw new AppError("Video not found", 404);
     }
 
     const { status, input, analysisJson } = videoData;
@@ -80,7 +81,7 @@ class VideoService {
   async deleteVideo(userId, videoId) {
     const videoData = await this.repo.getVideo(userId, videoId);
     if (!videoData) {
-      throw new Error("Video not found");
+      throw new AppError("Video not found", 404);
     }
 
     // 1. Cleanup E2 Artifacts
