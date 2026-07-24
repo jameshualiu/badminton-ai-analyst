@@ -19,7 +19,12 @@ class BadmintonInference:
         self.court_det  = CourtDetectorAdapter(court_kprcnn_path)
         self.net_det    = NetDetectorAdapter(net_kprcnn_path)
         self.pose_det   = YoloPoseAdapter(yolo_pose_path)
-        self.shot_clf   = ShotClassifierAdapter(lstm_path) if lstm_path else None
+        self.shot_clf = None
+        if lstm_path:
+            try:
+                self.shot_clf = ShotClassifierAdapter(lstm_path)
+            except Exception as e:
+                print(f"[lstm] WARNING: failed to load ({e}); using rule-based shot classification")
 
         # Learned hit detection (CNN over trajectory windows); heuristic fallback
         self.hit_det = None
