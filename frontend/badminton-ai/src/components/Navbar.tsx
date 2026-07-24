@@ -80,14 +80,14 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
             className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
               isDashboard
                 ? "bg-primary/10 text-primary"
-                : "text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-white/5"
+                : "text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-white/5"
             }`}
           >
             Sessions
           </button>
           <button
             onClick={onUploadClick}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             New Analysis
@@ -100,7 +100,7 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
         <button
           onClick={toggle}
           aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-          className="relative w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
+          className="relative w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
         >
           <Sun className={`absolute w-4 h-4 transition-all duration-200 ${isDark ? "opacity-0 rotate-90 scale-50" : "opacity-100"}`} />
           <Moon className={`absolute w-4 h-4 transition-all duration-200 ${isDark ? "opacity-100" : "opacity-0 -rotate-90 scale-50"}`} />
@@ -110,7 +110,7 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen((o) => !o)}
-            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+            className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
           >
             <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-[11px] font-bold text-primary-foreground overflow-hidden shrink-0">
               {user?.photoURL ? (
