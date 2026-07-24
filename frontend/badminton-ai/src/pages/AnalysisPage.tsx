@@ -2,6 +2,7 @@ import type { Timestamp } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { shotColor } from "../utils/shotUtils";
+import { fmtTime } from "../utils/timeUtils";
 import LiveTracker from "../features/analysis/components/LiveTracker";
 import { ShotStatsTab } from "../features/analysis/components/ShotStatsTab";
 import { useAnalysisData } from "../features/analysis/hooks/useAnalysisData";
@@ -14,12 +15,6 @@ const COCO_PAIRS: [number, number][] = [
 ];
 
 const RALLY_GAP_SEC = 5;
-
-function fmtTime(sec: number): string {
-  const m = Math.floor(sec / 60),
-    s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 function fmtDate(ts: Timestamp | undefined): string {
   if (!ts?.toDate) return "";
