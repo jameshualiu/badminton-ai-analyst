@@ -19,6 +19,19 @@ const COCO_PAIRS: [number, number][] = [
 
 const RALLY_GAP_SEC = 5;
 
+// Canvas overlay colors
+const COURT_LINE_COLOR = "rgba(137,194,217,0.55)";
+const PLAYER_COLORS = ["#89c2d9", "#2c7da0"];
+const SHUTTLE_FILL_COLOR = "#fff";
+
+// Rally log inline styles
+const RALLY_TILE_BG = "rgba(255,255,255,0.03)";
+const RALLY_TILE_BORDER = "1px solid rgba(255,255,255,0.07)";
+const RALLY_PROGRESS_TRACK_BG = "rgba(255,255,255,0.06)";
+const RALLY_LONG_BORDER = "2px solid rgba(245,158,11,0.4)";
+const RALLY_GRADIENT_LONG = "linear-gradient(90deg,#f59e0b,#d97706)";
+const RALLY_GRADIENT_DEFAULT = "linear-gradient(90deg,#3B82F6,#0891b2)";
+
 function fmtDate(ts: Timestamp | undefined): string {
   if (!ts?.toDate) return "";
   return ts
@@ -102,7 +115,7 @@ export default function AnalysisPage() {
 
       if (ov.court && analysisData.geometry?.court_keypoints_35) {
         const kp = analysisData.geometry.court_keypoints_35;
-        ctx.strokeStyle = "rgba(137,194,217,0.55)";
+        ctx.strokeStyle = COURT_LINE_COLOR;
         ctx.lineWidth = 1.5;
         for (let row = 0; row < 7; row++) {
           for (let col = 0; col < 5; col++) {
@@ -127,9 +140,8 @@ export default function AnalysisPage() {
           entry = trackingByFrame.get(frame - off) ?? trackingByFrame.get(frame + off);
         }
         if (entry) {
-          const playerColors = ["#89c2d9", "#2c7da0"];
           entry.players.forEach((player, pi) => {
-            const color = playerColors[pi % 2];
+            const color = PLAYER_COLORS[pi % 2];
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
             COCO_PAIRS.forEach(([a, b]) => {
@@ -158,8 +170,8 @@ export default function AnalysisPage() {
         if (entry?.pos) {
           const [x, y] = sc(entry.pos);
           ctx.shadowBlur = 5;
-          ctx.shadowColor = "#89c2d9";
-          ctx.fillStyle = "#fff";
+          ctx.shadowColor = PLAYER_COLORS[0];
+          ctx.fillStyle = SHUTTLE_FILL_COLOR;
           ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
           ctx.shadowBlur = 0;
         }
@@ -452,7 +464,7 @@ export default function AnalysisPage() {
                       <div
                         key={label}
                         className="rounded-lg p-3"
-                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+                        style={{ background: RALLY_TILE_BG, border: RALLY_TILE_BORDER }}
                       >
                         <div className="text-[9px] font-bold uppercase tracking-[.8px] text-slate-500 dark:text-slate-400 mb-1">
                           {label}
@@ -482,7 +494,7 @@ export default function AnalysisPage() {
                         <div
                           key={i}
                           className="flex items-center gap-4 px-5 py-3 border-b border-slate-100 dark:border-border/40 cursor-pointer hover:bg-primary/5 transition-colors"
-                          style={isLong ? { borderLeft: "2px solid rgba(245,158,11,0.4)" } : {}}
+                          style={isLong ? { borderLeft: RALLY_LONG_BORDER } : {}}
                           onClick={() => {
                             if (videoRef.current) videoRef.current.currentTime = startSec;
                           }}
@@ -497,15 +509,13 @@ export default function AnalysisPage() {
                             {/* Progress bar proportional to shot count */}
                             <div
                               className="h-[3px] rounded-full mb-1.5 overflow-hidden"
-                              style={{ background: "rgba(255,255,255,0.06)" }}
+                              style={{ background: RALLY_PROGRESS_TRACK_BG }}
                             >
                               <div
                                 className="h-full rounded-full"
                                 style={{
                                   width: `${(rally.length / Math.max(...rallies.map((r) => r.length))) * 100}%`,
-                                  background: isLong
-                                    ? "linear-gradient(90deg,#f59e0b,#d97706)"
-                                    : "linear-gradient(90deg,#3B82F6,#0891b2)",
+                                  background: isLong ? RALLY_GRADIENT_LONG : RALLY_GRADIENT_DEFAULT,
                                 }}
                               />
                             </div>
