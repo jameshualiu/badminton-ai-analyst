@@ -1,5 +1,6 @@
 const { admin } = require('../config/firebase');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 const verifyToken = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -13,7 +14,7 @@ const verifyToken = async (req, res, next) => {
     req.user = decodedValue;
     next();
   } catch (e) {
-    console.error('Token verification failed', e);
+    logger.error({ err: e }, "Token verification failed");
     return next(new AppError('Invalid or expired token', 403));
   }
 };
