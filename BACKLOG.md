@@ -54,6 +54,10 @@ _(none yet)_
   **Target File(s):** `frontend/badminton-ai/src/context/ThemeContext.tsx`, `frontend/badminton-ai/src/context/theme-context.ts` (new), `frontend/badminton-ai/src/context/useTheme.ts` (new)
   **Description:** CI lint was failing because `ThemeContext.tsx` exported both the `ThemeProvider` component and non-component values (the context object, the `useTheme` hook), which breaks Vite Fast Refresh boundaries. Split the context object into `theme-context.ts` and the `useTheme` hook into `useTheme.ts`, leaving `ThemeContext.tsx` exporting only the `ThemeProvider` component. Updated the three importers (`App.tsx`, `Navbar.tsx`, `LandingPage.tsx`).
 
+- [x] **[FE-02] Fix rAF-driven re-render thrash during video playback**
+  **Target File(s):** `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/features/analysis/components/LiveTracker.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoTimeline.tsx` (new), `frontend/badminton-ai/src/features/analysis/components/ShotLog.tsx` (new), `frontend/badminton-ai/src/features/analysis/hooks/useCurrentTimeStore.ts` (new), `frontend/badminton-ai/src/utils/timeUtils.ts` (new)
+  **Description:** Replaced the `useState`-driven `currentTime` (updated on every rAF tick during playback) with an external `useCurrentTimeStore` read via `useSyncExternalStore`, and extracted `VideoTimeline`/`ShotLog` components plus rewired `LiveTracker` to subscribe to it directly — so 60Hz playback ticks no longer re-render the shot log, rally log, and stat tiles. Merged via [PR #13](https://github.com/jameshualiu/shuttleye/pull/13).
+
 ---
 
 ## TODO
@@ -76,11 +80,6 @@ _(none yet)_
   **Description:** 40+ committed `.npz` feature files and a reference-implementation folder bloat the repo; move to Git LFS, external storage, or `.gitignore`, but confirm nothing in `worker/train/*.py` depends on them being present at a fixed path before removing.
 
 ### 🎨 Frontend (React/TS)
-
-- [ ] **[FE-02] Fix rAF-driven re-render thrash during video playback**
-  **Target File(s):** `frontend/badminton-ai/src/pages/AnalysisPage.tsx` (lines ~656–668, `currentTime` state at ~480)
-  **Impact vs. Effort:** High Impact / Low-Medium Effort
-  **Description:** `setCurrentTime` fires every animation frame (~60fps) and re-renders the entire page tree (shot log, rally log, stat tiles). Isolate anything that needs `currentTime` into a small subscribed child so the 60Hz update no longer cascades through the whole component.
 
 - [ ] **[FE-03] Extract magic numbers and inline `style={{}}` objects**
   **Target File(s):** `frontend/badminton-ai/src/features/analysis/components/CourtHeatmap.tsx` (`SVG_COURT`, `COURT_M`), `frontend/badminton-ai/src/pages/AnalysisPage.tsx` (hardcoded hex/rgba values throughout)
