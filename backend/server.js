@@ -8,18 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const VideoRepository = require('./src/repository/VideoRepository');
-const VideoService = require('./src/service/VideoService');
-const VideoController = require('./src/controller/VideoController');
-
-const authMiddleware = require('./src/middleware/authMiddleware');
 const errorHandler = require('./src/middleware/errorHandler');
-const { globalLimiter, uploadLimiter } = require('./src/middleware/rateLimiter');
-
-//dependency injection
-const videoRepo = new VideoRepository(db);
-const videoService = new VideoService(videoRepo);
-const videoController = new VideoController(videoService);
+const { globalLimiter } = require('./src/middleware/rateLimiter');
+const videoRoutes = require('./src/routes/videoRoutes');
 
 const apiRouter = express.Router();
 
@@ -32,12 +23,7 @@ apiRouter.get("/health/firestore", async (_req, res) => {
   res.json({ ok: true, size: snap.size });
 });
 
-apiRouter.get( "/videos/:videoId/results",  authMiddleware,  videoController.getResults);
-apiRouter.delete("/videos/:videoId", authMiddleware, videoController.deleteVideo);
-
-// Specific stricter limit for video uploads (Expensive operations)
-apiRouter.post("/videos/init", authMiddleware, uploadLimiter, videoController.initUpload);
-apiRouter.post("/videos/:videoId/complete", authMiddleware, uploadLimiter, videoController.finalizeUpload);
+apiRouter.use("/videos", videoRoutes);
 
 app.use("/api", apiRouter);
 
