@@ -190,13 +190,22 @@ class BadmintonPipeline:
         vr_hd = VideoReader(video_path, ctx=cpu(0), width=1280, height=720)
         player_tracking = []
         kp6_raw = (self.geometry or {}).get("court_keypoints_6")
-        # kp6 was detected on 512x288; scale to 1280x720 for vr_hd player coords
-        HD_W, HD_H, SD_W, SD_H = 1280, 720, 512, 288
-        if kp6_raw:
-            sx, sy = HD_W / SD_W, HD_H / SD_H
-            kp6 = [[pt[0] * sx, pt[1] * sy] for pt in kp6_raw]
-        else:
-            kp6 = None
+
+        # decord doesn't expose reader width/height directly, so derive the actual
+        # decoded frame size from a sample frame rather than assuming the requested
+        # size was honored exactly (unusual source aspect ratios can round differently).
+        SD_H, SD_W = vr[0].asnumpy().shape[:2]
+        HD_H, HD_W = vr_hd[0].asnumpy().shape[:2]
+        if (SD_W, SD_H) != (512, 288):
+            print(f"WARNING:  SD reader returned {SD_W}x{SD_H}, requested 512x288")
+        if (HD_W, HD_H) != (1280, 720):
+            print(f"WARNING:  HD reader returned {HD_W}x{HD_H}, requested 1280x720")
+
+        # kp6 was detected on the SD reader; scale to HD for vr_hd player coords.
+        # Computed unconditionally (not just when kp6_raw is present) since
+        # _scale_player below needs sx/sy regardless of whether geometry was found.
+        sx, sy = HD_W / SD_W, HD_H / SD_H
+        kp6 = [[pt[0] * sx, pt[1] * sy] for pt in kp6_raw] if kp6_raw else None
 
         # Diagnostic counters
         _raw_counts = {0: 0, 1: 0, 2: 0}
