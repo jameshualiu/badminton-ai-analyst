@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { motion } from "motion/react";
 import { ChevronRight, Moon, Play, Sparkles, Sun, Zap } from "lucide-react";
 import { useAuthUser } from "../auth/hooks/useAuthUser";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../context/useTheme";
 
 // ── Illustrated panels ────────────────────────────────────────────────────────
 

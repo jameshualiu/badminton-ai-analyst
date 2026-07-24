@@ -6,7 +6,8 @@ import DashboardPage from "./pages/DashboardPage";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import PrivateLayout from "./layouts/PrivateLayout";
 import AnalysisPage from "./pages/AnalysisPage";
-import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import { useTheme } from "./context/useTheme";
 
 function ThemedApp() {
   const { isDark } = useTheme();
