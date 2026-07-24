@@ -1,3 +1,5 @@
+const logger = require('../utils/logger');
+
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
     status: err.status,
@@ -18,7 +20,7 @@ const sendErrorProd = (err, res) => {
     // Programming or other unknown error: don't leak error details
   } else {
     // 1) Log error
-    console.error('ERROR 💥', err);
+    logger.error({ err }, "Unhandled error");
 
     // 2) Send generic message
     res.status(500).json({

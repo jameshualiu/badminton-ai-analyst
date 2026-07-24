@@ -1,5 +1,6 @@
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
+const logger = require('../utils/logger');
 
 class VideoController {
   constructor(videoService) {
@@ -36,8 +37,8 @@ class VideoController {
     try {
         const videoData = await this.service.repo.getVideo(userId, videoId);
         if (videoData && videoData.input && videoData.input.e2Key) {
-            console.log(`🚀 Triggering Modal AI for video: ${videoId}`);
-            
+            logger.info({ videoId }, "Triggering Modal AI");
+
             // Fire and forget (don't await so the user gets an instant response)
             fetch(process.env.MODAL_WEBHOOK_URL, {
                 method: 'POST',
@@ -51,17 +52,17 @@ class VideoController {
             .then(async (response) => {
                 if (!response.ok) {
                     const errText = await response.text().catch(() => '');
-                    console.error(`❌ Modal returned ${response.status}:`, errText);
+                    logger.error({ videoId, status: response.status, errText }, "Modal webhook returned non-OK status");
                     await this.service.markFailed(userId, videoId, `Worker trigger failed (${response.status})`);
                 }
             })
             .catch(async (err) => {
-                console.error('❌ Modal Trigger Error:', err);
+                logger.error({ videoId, err }, "Modal trigger request failed");
                 await this.service.markFailed(userId, videoId, `Worker trigger error: ${err.message}`);
             });
         }
     } catch (err) {
-        console.error('❌ Error fetching video for Modal trigger:', err);
+        logger.error({ videoId, err }, "Failed to fetch video for Modal trigger");
     }
 
     res.json({ status: 'queued' });

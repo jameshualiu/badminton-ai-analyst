@@ -3,6 +3,7 @@ const { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2C
 const { v4: uuidv4 } = require('uuid');
 const r2Client = require('../config/r2');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 class VideoService {
   constructor(videoRepo) {
@@ -110,7 +111,7 @@ class VideoService {
           await r2Client.send(deleteCommand);
         }
       } catch (err) {
-        console.error(`Failed to delete R2 objects for prefix ${prefix}:`, err);
+        logger.error({ prefix, err }, "Failed to delete R2 objects");
         // We continue to delete the DB record even if S3 fails
       }
     }
