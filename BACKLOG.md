@@ -42,6 +42,10 @@ _(none yet)_
   **Target File(s):** `worker/inference.py`, `worker/tests/test_lstm_load_fallback.py` (new)
   **Description:** Brought `ShotClassifierAdapter(lstm_path)` load in line with the other optional-model loads (`hit_detector_path`, `bst_path`, `tracknet_v3_path`) by wrapping it in try/except-with-warning, so a corrupt ONNX file degrades gracefully instead of crashing worker boot. Merged via [PR #9](https://github.com/jameshualiu/shuttleye/pull/9).
 
+- [x] **[WK-03] Derive HD/SD scale factors from actual reader dimensions**
+  **Target File(s):** `worker/pipeline.py`
+  **Description:** Replaced hardcoded `HD_W, HD_H, SD_W, SD_H = 1280, 720, 512, 288` with values derived from the actual decoded frames of `vr_hd`/`vr` at runtime, and the analysis summary now reports the derived resolution instead of the old hardcoded constant. Merged via [PR #11](https://github.com/jameshualiu/shuttleye/pull/11).
+
 - [x] **[REPO-04] Fix `react-refresh/only-export-components` lint error in `ThemeContext.tsx`**
   **Target File(s):** `frontend/badminton-ai/src/context/ThemeContext.tsx`, `frontend/badminton-ai/src/context/theme-context.ts` (new), `frontend/badminton-ai/src/context/useTheme.ts` (new)
   **Description:** CI lint was failing because `ThemeContext.tsx` exported both the `ThemeProvider` component and non-component values (the context object, the `useTheme` hook), which breaks Vite Fast Refresh boundaries. Split the context object into `theme-context.ts` and the `useTheme` hook into `useTheme.ts`, leaving `ThemeContext.tsx` exporting only the `ThemeProvider` component. Updated the three importers (`App.tsx`, `Navbar.tsx`, `LandingPage.tsx`).
@@ -80,11 +84,6 @@ _(none yet)_
   **Description:** Pull hardcoded court-SVG coordinates and repeated inline color/opacity styling into named constants or Tailwind theme tokens for consistency with the rest of the styling system. Note: as of FE-01, `SVG_COURT`/`COURT_M` now live in `CourtHeatmap.tsx` rather than `AnalysisPage.tsx`.
 
 ### 🧠 Worker (Python/Modal)
-
-- [ ] **[WK-03] Derive HD/SD scale factors from actual reader dimensions**
-  **Target File(s):** `worker/pipeline.py` (lines ~255–260)
-  **Impact vs. Effort:** Medium Impact / Low Effort
-  **Description:** Replace hardcoded `HD_W, HD_H, SD_W, SD_H = 1280, 720, 512, 288` with values read from `vr_hd`/`vr` at runtime, plus an assertion/log if the decord reader doesn't honor the requested resolution — prevents silent misalignment on unusual source aspect ratios.
 
 - [ ] **[WK-04] Add test coverage for coordinate-scaling logic**
   **Target File(s):** new `worker/tests/test_coordinate_scaling.py`, mirroring `pipeline.py`'s `_scale_player` / `sx,sy` logic
