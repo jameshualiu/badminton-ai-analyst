@@ -247,8 +247,13 @@ class BadmintonPipeline:
 
         # BST stroke classifier overrides the LSTM/rule-based "type" when loaded
         if getattr(self.engine, "bst_clf", None) is not None and hits:
-            hits = self.engine.bst_clf.classify_hits(
-                hits, shuttle_traj, player_tracking, fps, self.pixel_to_meters)
+            try:
+                hits = self.engine.bst_clf.classify_hits(
+                    hits, shuttle_traj, player_tracking, fps, self.pixel_to_meters)
+            except Exception as e:
+                print(f"[bst] WARNING: classify_hits failed at runtime ({e}); "
+                      f"falling back to LSTM/rule-based classification")
+                hits = self._classify_hits(hits, player_tracking, shuttle_traj, force_lstm=True)
 
         shot_counts = dict(Counter(h["type"] for h in hits))
 
@@ -589,7 +594,7 @@ class BadmintonPipeline:
     # Classification -- LSTM (with rule-based fallback)
     # -------------------------------------------------------------------------
 
-    def _classify_hits(self, hits, player_tracking, shuttle_traj):
+    def _classify_hits(self, hits, player_tracking, shuttle_traj, force_lstm=False):
         """
         Classify each hit using the LSTM if available, rule-based otherwise.
 
@@ -600,6 +605,11 @@ class BadmintonPipeline:
         Key fix: locks the hitter's player index at the hit frame and uses
         that same index throughout the sequence window -- prevents swapping
         between hitter and receiver mid-sequence.
+
+        force_lstm: bypasses the "BST will override anyway" skip below --
+        used when BST is loaded but its classify_hits() call failed at
+        runtime, so this becomes the fallback classification pass instead
+        of the pre-BST pass.
         """
         if not hits:
             return hits
@@ -612,7 +622,8 @@ class BadmintonPipeline:
         SEQ_AFTER   = 15
 
         # Skip the LSTM when BST will assign types afterwards anyway
-        use_lstm = self.engine.shot_clf is not None and getattr(self.engine, "bst_clf", None) is None
+        use_lstm = force_lstm or (
+            self.engine.shot_clf is not None and getattr(self.engine, "bst_clf", None) is None)
 
         def foot_x(p):
             sk = p["skeleton"]
