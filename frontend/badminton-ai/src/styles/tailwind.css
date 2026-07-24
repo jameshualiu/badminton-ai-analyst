@@ -68,6 +68,11 @@
   --color-surface: var(--surface);
   --color-surface-hover: var(--surface-hover);
 
+  /* Video player chrome — intentionally constant across all themes (letterbox/canvas
+     backgrounds stay near-black regardless of the active site theme) */
+  --color-video-canvas: #04080d;
+  --color-video-chrome: #080c10;
+
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
