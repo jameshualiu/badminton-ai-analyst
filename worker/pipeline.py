@@ -271,7 +271,7 @@ class BadmintonPipeline:
                 "durationSec": total_frames / (fps if fps > 0 else 30),
                 "totalShots": len(hits),
                 "shotCounts": shot_counts,
-                "resolution": [512, 288]
+                "resolution": [SD_W, SD_H]
             },
             "geometry": self.geometry,
             "events": hits,
