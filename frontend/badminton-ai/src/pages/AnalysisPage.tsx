@@ -315,7 +315,7 @@ export default function AnalysisPage() {
 
                 {/* Video player */}
                 <div className="dark:bg-card bg-white border border-border rounded-xl overflow-hidden flex flex-col">
-                  <div className="relative w-full flex-1 min-h-0 bg-[#04080d] flex items-center justify-center cursor-pointer group overflow-hidden">
+                  <div className="relative w-full flex-1 min-h-0 bg-video-canvas flex items-center justify-center cursor-pointer group overflow-hidden">
                     {urls.annotatedVideo || urls.originalVideo ? (
                       <video
                         ref={videoRef}
@@ -355,7 +355,7 @@ export default function AnalysisPage() {
                             className={`text-[10px] font-medium py-1 px-2.5 rounded-lg border cursor-pointer transition-all ${
                               ov[k]
                                 ? "bg-primary/15 border-primary/40 text-primary"
-                                : "border-primary/20 bg-[#080c10]/80 text-slate-400 dark:text-slate-500"
+                                : "border-primary/20 bg-video-chrome/80 text-slate-400 dark:text-slate-500"
                             }`}
                           >
                             {k.charAt(0).toUpperCase() + k.slice(1)}

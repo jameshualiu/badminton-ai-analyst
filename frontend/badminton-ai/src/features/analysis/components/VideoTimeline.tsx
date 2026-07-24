@@ -57,7 +57,7 @@ export function VideoTimeline({ duration, shotEvents, fps, videoRef, store }: Pr
           return (
             <div
               key={i}
-              className="absolute -translate-x-1/2 w-[6px] h-[6px] rounded-full border border-[#080c10] transition-transform hover:scale-[1.8]"
+              className="absolute -translate-x-1/2 w-[6px] h-[6px] rounded-full border border-video-chrome transition-transform hover:scale-[1.8]"
               style={{ left: `${evPct}%`, background: c, boxShadow: `0 0 8px ${c}80` }}
             />
           );
