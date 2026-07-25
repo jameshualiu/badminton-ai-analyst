@@ -19,11 +19,9 @@ backend/src/config/serviceAccount.json
 *.p12
 *.key
 
-# Internal notes / planning docs / AI instructions 
+# Internal notes / planning docs / AI instructions
 ARTHUR_INTEGRATION_PLAN.md
 GEMINI.md
-CLAUDE.md
-data-flow.md
 docs/
 .claude/
 .superpowers/
