@@ -89,3 +89,8 @@ _(none yet)_
   **Target File(s):** `render.yaml`, Render dashboard (tear down the web service)
   **Impact vs. Effort:** Low Impact / Low Effort
   **Description:** Follow-up to BE-05, gated on the Vercel backend being confirmed stable in production — keep the Render service live as a fallback during cutover, don't rip it out early. Once verified: delete `render.yaml` and tear down the Render web service. Docs need no changes (only `render.yaml` references the platform; `data-flow.md`/`CLAUDE.md`/`README.md` don't name Render).
+
+- [ ] **[BE-07] Replace in-memory rate-limit store for serverless correctness**
+  **Target File(s):** `backend/src/middleware/rateLimiter.js`, `backend/package.json`
+  **Impact vs. Effort:** Medium Impact / Medium Effort
+  **Description:** Follow-up surfaced by BE-05 — `express-rate-limit` uses its default in-memory store, which on Vercel serverless is per-instance and resets on every cold start, so neither the global (100/15min) nor the upload (10/30min) limit is enforced consistently across concurrent/ephemeral instances. The limiter won't error, it just stops being an effective control. Swap the in-memory store for a shared backing store (e.g. Upstash Redis via `rate-limit-redis`, which fits Vercel's serverless model) so limits hold across instances. Not a blocker for the migration; do it after BE-05 lands.
