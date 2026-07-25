@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **BE-05** — the last remaining open ticket, tracking the suspected Render free-tier cold-start trigger behind the now-fixed FE-04.
+Recommended starting point: **BE-05** — migrate the backend off Render onto Vercel to kill the cold-start class of bug (the suspected FE-04 trigger) and consolidate hosting; **BE-06** is the Render teardown, gated on BE-05 being verified in prod.
 
 ---
 
@@ -80,7 +80,12 @@ _(none yet)_
 
 ### ⚙️ Backend (Node/Express)
 
-- [ ] **[BE-05] Investigate/mitigate Render free-tier cold starts**
-  **Target File(s):** `render.yaml`
-  **Impact vs. Effort:** Medium Impact / Low Effort (pending investigation)
-  **Description:** Suspected trigger for FE-04 — Render's free plan (`render.yaml`: `plan: free`) spins the backend down after ~15 min of no traffic and cold-boots on the next request, which can return a 502 for the first request after idle. Confirm via Render's logs/timestamps whether this correlates with reported missing-data incidents, then mitigate (keep-alive ping, upgrade plan, or rely on FE-04's retry logic to absorb it).
+- [ ] **[BE-05] Migrate backend from Render to Vercel serverless**
+  **Target File(s):** `backend/` (Express entry point + new `vercel.json`/`api/` handler), `backend/src/controller/VideoController.js`, `frontend/badminton-ai/.env.local` (`VITE_API_BASE_URL`), Vercel project env vars
+  **Impact vs. Effort:** High Impact / Medium Effort
+  **Description:** Consolidate hosting onto Vercel (which already serves the frontend) to eliminate Render free-tier cold starts — the suspected FE-04 trigger, where the backend spins down after ~15 min idle and cold-boots (30s–2min) on the next request, returning a 502. The backend is a clean serverless fit: stateless, never touches video bytes (uploads go browser↔E2 directly via presigned URLs), all operations sub-second JSON. Work: adapt the Express app for Vercel (`@vercel/node` wrapper or restructure into `api/` handlers), add `vercel.json`, port the env vars (`FIREBASE_*`, `E2_*`, `MODAL_WEBHOOK_URL`) into the Vercel project, and repoint the frontend's `VITE_API_BASE_URL` at the new backend URL. **Correctness-critical:** the Modal trigger in `completeUpload` is fire-and-forget (un-awaited `fetch`, [VideoController.js:43](backend/src/controller/VideoController.js#L43)); on serverless the instance can be frozen the moment the response returns, so the webhook — and its `.catch()`/`markFailed` error handling — may silently never run. Wrap that fetch in `waitUntil()` from `@vercel/functions` so the runtime keeps the instance alive until it settles, without blocking the instant `{ status: "queued" }` response. (This one line only works on Vercel, so it's inseparable from the migration.)
+
+- [ ] **[BE-06] Decommission Render after Vercel cutover is verified**
+  **Target File(s):** `render.yaml`, Render dashboard (tear down the web service)
+  **Impact vs. Effort:** Low Impact / Low Effort
+  **Description:** Follow-up to BE-05, gated on the Vercel backend being confirmed stable in production — keep the Render service live as a fallback during cutover, don't rip it out early. Once verified: delete `render.yaml` and tear down the Render web service. Docs need no changes (only `render.yaml` references the platform; `data-flow.md`/`CLAUDE.md`/`README.md` don't name Render).
