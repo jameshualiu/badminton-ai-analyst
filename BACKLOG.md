@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **REPO-01** — zero code risk, highest visibility-to-risk ratio of anything in this backlog.
+All tracked tickets are currently resolved — see the DONE section below. Add new tickets to TODO as they come up.
 
 ---
 
@@ -62,22 +62,16 @@ _(none yet)_
   **Target File(s):** `frontend/badminton-ai/src/features/analysis/components/CourtHeatmap.tsx`, `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoTimeline.tsx`, `frontend/badminton-ai/src/styles/tailwind.css`
   **Description:** Derived `CourtHeatmap`'s SVG geometry from `SVG_COURT` instead of hand-copied pixel coordinates, named the repeated canvas-draw and rally-log inline-style color literals in `AnalysisPage`, and added `--color-video-canvas`/`--color-video-chrome` Tailwind tokens to de-duplicate the hardcoded video-chrome hex shared between `AnalysisPage` and `VideoTimeline`. No visual change — verified each derived/tokenized value against the original literal. Merged via [PR #14](https://github.com/jameshualiu/shuttleye/pull/14).
 
+- [x] **[REPO-01] Un-gitignore architecture docs & remove orphaned root `package.json`**
+  **Target File(s):** `.gitignore`, `data-flow.md`, `CLAUDE.md`, `package.json` (repo root), `package-lock.json` (repo root)
+  **Description:** Removed `CLAUDE.md`/`data-flow.md` from `.gitignore` and committed them, and deleted the orphaned root `package.json`/`package-lock.json` — their only dependency (`motion`) was already independently declared and actively used in `frontend/badminton-ai/package.json`, and nothing (including CI) referenced the root manifest. Merged via [PR #15](https://github.com/jameshualiu/shuttleye/pull/15).
+
+- [x] **[REPO-02] Relocate/exclude training artifacts**
+  **Target File(s):** `worker/train/features_v3/*.npz`, `.bst-ref/`
+  **Description:** Investigated and found this was already resolved — both directories were added to `.gitignore` back in commit `0d08575` ("chore: update .gitignore, remove old design doc from repo") and have zero git history (`git log --all` returns nothing for either path), so nothing is actually committed to relocate or exclude. Confirmed `.npz` features are regenerable via `extract_features.py` and never referenced at a fixed path by runtime code (`worker/app.py`'s Modal deploy explicitly excludes `train/features_v3/**`), and confirmed `.bst-ref/` is vendored third-party reference code (TemPose paper implementation) that should stay untracked. No code change — this ticket needed no PR.
+
 ---
 
 ## TODO
 
-### 📁 Repo & Documentation
-
-- [ ] **[REPO-01] Un-gitignore architecture docs & remove orphaned root `package.json`**
-  **Target File(s):** `.gitignore`, `data-flow.md`, `CLAUDE.md`, `package.json` (repo root), `package-lock.json` (repo root)
-  **Impact vs. Effort:** High Impact / Low Effort
-  **Description:** Two small, independent repo-hygiene fixes bundled into one ticket since both are trivial and zero-risk: (1) remove `data-flow.md` and `CLAUDE.md` from `.gitignore` and commit them — they're currently the best-written artifacts in the repo and invisible to anyone cloning it from GitHub; (2) delete the root-level `package.json`/`package-lock.json` (a stray `motion` dependency with no workspace config), folding the dependency into the frontend if it's still needed there.
-
-- [ ] **[REPO-02] Relocate/exclude training artifacts**
-  **Target File(s):** `worker/train/features_v3/*.npz`, `.bst-ref/`
-  **Impact vs. Effort:** Medium Impact / Low-Medium Effort
-  **Description:** 40+ committed `.npz` feature files and a reference-implementation folder bloat the repo; move to Git LFS, external storage, or `.gitignore`, but confirm nothing in `worker/train/*.py` depends on them being present at a fixed path before removing.
-
-### 🧠 Worker (Python/Modal)
-
-_(none currently)_
+_(none currently — every open ticket has been resolved; see BACKLOG history in git log for what's been done)_
