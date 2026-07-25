@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-All tracked tickets are currently resolved — see the DONE section below. Add new tickets to TODO as they come up.
+Recommended starting point: **FE-04** — confirmed root cause of missing shot log/rally map data; **BE-05** is a follow-up investigation, not yet confirmed.
 
 ---
 
@@ -74,4 +74,16 @@ _(none yet)_
 
 ## TODO
 
-_(none currently — every open ticket has been resolved; see BACKLOG history in git log for what's been done)_
+### 🎨 Frontend (React/TS)
+
+- [ ] **[FE-04] Add retry/backoff and error-state UI to analysis results fetch**
+  **Target File(s):** `frontend/badminton-ai/src/features/analysis/hooks/useAnalysisData.ts`, `frontend/badminton-ai/src/features/analysis/videoService.ts`
+  **Impact vs. Effort:** High Impact / Medium Effort
+  **Description:** `useAnalysisData`'s results-fetching effect (`GET /videos/:id/results` + the E2 `analysisJson` fetch) runs exactly once with no retry and swallows failures via `console.error` only, so a single transient failure (e.g. a cold-started backend returning a 502) leaves `analysisData` permanently null for that session — silently blanking the shot log, rally map, tracking stat tiles, overlay toggle buttons, and Shot Stats tab, while Firestore-sourced fields (title, duration, `totalShots`) still render fine, producing a confusing partial page with no visible error. Add retry/backoff and a visible error/retry state; also fix the stale `http://localhost:3000/api/v1` fallback base URL (the backend actually mounts at `/api`, no `/v1`) and de-duplicate against the already-exported but unused `getVideoResults()` in `videoService.ts`.
+
+### ⚙️ Backend (Node/Express)
+
+- [ ] **[BE-05] Investigate/mitigate Render free-tier cold starts**
+  **Target File(s):** `render.yaml`
+  **Impact vs. Effort:** Medium Impact / Low Effort (pending investigation)
+  **Description:** Suspected trigger for FE-04 — Render's free plan (`render.yaml`: `plan: free`) spins the backend down after ~15 min of no traffic and cold-boots on the next request, which can return a 502 for the first request after idle. Confirm via Render's logs/timestamps whether this correlates with reported missing-data incidents, then mitigate (keep-alive ping, upgrade plan, or rely on FE-04's retry logic to absorb it).
