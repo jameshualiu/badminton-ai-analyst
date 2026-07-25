@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **REPO-01** — zero code risk, highest visibility-to-risk ratio of anything in this backlog.
+Recommended starting point: **REPO-01+02** — zero code risk, highest visibility-to-risk ratio of anything in this backlog.
 
 ---
 
@@ -58,33 +58,25 @@ _(none yet)_
   **Target File(s):** `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/features/analysis/components/LiveTracker.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoTimeline.tsx` (new), `frontend/badminton-ai/src/features/analysis/components/ShotLog.tsx` (new), `frontend/badminton-ai/src/features/analysis/hooks/useCurrentTimeStore.ts` (new), `frontend/badminton-ai/src/utils/timeUtils.ts` (new)
   **Description:** Replaced the `useState`-driven `currentTime` (updated on every rAF tick during playback) with an external `useCurrentTimeStore` read via `useSyncExternalStore`, and extracted `VideoTimeline`/`ShotLog` components plus rewired `LiveTracker` to subscribe to it directly — so 60Hz playback ticks no longer re-render the shot log, rally log, and stat tiles. Merged via [PR #13](https://github.com/jameshualiu/shuttleye/pull/13).
 
+- [x] **[FE-03] Extract magic numbers and inline `style={{}}` objects**
+  **Target File(s):** `frontend/badminton-ai/src/features/analysis/components/CourtHeatmap.tsx`, `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoTimeline.tsx`, `frontend/badminton-ai/src/styles/tailwind.css`
+  **Description:** Derived `CourtHeatmap`'s SVG geometry from `SVG_COURT` instead of hand-copied pixel coordinates, named the repeated canvas-draw and rally-log inline-style color literals in `AnalysisPage`, and added `--color-video-canvas`/`--color-video-chrome` Tailwind tokens to de-duplicate the hardcoded video-chrome hex shared between `AnalysisPage` and `VideoTimeline`. No visual change — verified each derived/tokenized value against the original literal. Merged via [PR #14](https://github.com/jameshualiu/shuttleye/pull/14).
+
 ---
 
 ## TODO
 
 ### 📁 Repo & Documentation
 
-- [ ] **[REPO-01] Un-gitignore architecture docs**
-  **Target File(s):** `.gitignore`, `data-flow.md`, `CLAUDE.md`
+- [ ] **[REPO-01+02] Un-gitignore architecture docs & remove orphaned root `package.json`**
+  **Target File(s):** `.gitignore`, `data-flow.md`, `CLAUDE.md`, `package.json` (repo root), `package-lock.json` (repo root)
   **Impact vs. Effort:** High Impact / Low Effort
-  **Description:** Remove `data-flow.md` and `CLAUDE.md` from `.gitignore` and commit them. They're currently the best-written artifacts in the repo and are invisible to anyone cloning it from GitHub.
-
-- [ ] **[REPO-02] Remove orphaned root `package.json`**
-  **Target File(s):** `package.json` (repo root), `package-lock.json` (repo root)
-  **Impact vs. Effort:** Low Impact / Low Effort
-  **Description:** A root-level `package.json` with a single stray `motion` dependency and no workspace config reads as leftover cruft; delete it or fold the dependency into the frontend where it's actually used.
+  **Description:** Two small, independent repo-hygiene fixes bundled into one ticket since both are trivial and zero-risk: (1) remove `data-flow.md` and `CLAUDE.md` from `.gitignore` and commit them — they're currently the best-written artifacts in the repo and invisible to anyone cloning it from GitHub; (2) delete the root-level `package.json`/`package-lock.json` (a stray `motion` dependency with no workspace config), folding the dependency into the frontend if it's still needed there.
 
 - [ ] **[REPO-03] Relocate/exclude training artifacts**
   **Target File(s):** `worker/train/features_v3/*.npz`, `.bst-ref/`
   **Impact vs. Effort:** Medium Impact / Low-Medium Effort
   **Description:** 40+ committed `.npz` feature files and a reference-implementation folder bloat the repo; move to Git LFS, external storage, or `.gitignore`, but confirm nothing in `worker/train/*.py` depends on them being present at a fixed path before removing.
-
-### 🎨 Frontend (React/TS)
-
-- [ ] **[FE-03] Extract magic numbers and inline `style={{}}` objects**
-  **Target File(s):** `frontend/badminton-ai/src/features/analysis/components/CourtHeatmap.tsx` (`SVG_COURT`, `COURT_M`), `frontend/badminton-ai/src/pages/AnalysisPage.tsx` (hardcoded hex/rgba values throughout)
-  **Impact vs. Effort:** Low Impact / Low Effort
-  **Description:** Pull hardcoded court-SVG coordinates and repeated inline color/opacity styling into named constants or Tailwind theme tokens for consistency with the rest of the styling system. Note: as of FE-01, `SVG_COURT`/`COURT_M` now live in `CourtHeatmap.tsx` rather than `AnalysisPage.tsx`.
 
 ### 🧠 Worker (Python/Modal)
 
