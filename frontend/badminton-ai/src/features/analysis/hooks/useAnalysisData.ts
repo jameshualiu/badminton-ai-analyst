@@ -2,6 +2,9 @@ import { Timestamp, doc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db } from "../../../lib/firebase";
 import { useAuthUser } from "../../../auth/hooks/useAuthUser";
+import type { CancelState } from "../../../utils/retry";
+import { withRetry } from "../../../utils/retry";
+import { getVideoResults } from "../videoService";
 import type { AnalysisData, VideoStatus } from "../types";
 
 export type FirestoreVideoDoc = {
@@ -15,9 +18,6 @@ export type FirestoreVideoDoc = {
   createdAt?: Timestamp;
 };
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
-
 export function useAnalysisData(videoId: string | undefined) {
   const { user } = useAuthUser();
 
@@ -25,6 +25,8 @@ export function useAnalysisData(videoId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [urls, setUrls] = useState<Partial<Record<string, string>>>({});
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [resultsError, setResultsError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // Firestore subscription
   useEffect(() => {
@@ -51,37 +53,39 @@ export function useAnalysisData(videoId: string | undefined) {
   useEffect(() => {
     if (!user || !videoId || !docData) return;
     if (status !== "done" && status !== "running") return;
-    let cancelled = false;
+    const cancelState: CancelState = { cancelled: false };
     (async () => {
+      setResultsError(false);
       try {
         const token = await user.getIdToken();
-        const res = await fetch(`${API_BASE}/videos/${videoId}/results`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Failed to fetch results");
-        const data = await res.json();
-        if (cancelled) return;
+        const data = await withRetry(
+          () => getVideoResults(videoId, token),
+          cancelState,
+        );
+        if (cancelState.cancelled) return;
         if (data.urls) {
           setUrls(data.urls);
           if (data.urls.analysisJson) {
-            try {
-              const jr = await fetch(data.urls.analysisJson);
-              if (!jr.ok) throw new Error("Failed to fetch JSON");
-              const json = await jr.json();
-              if (!cancelled) setAnalysisData(json);
-            } catch (e) {
-              console.error(e);
-            }
+            const analysisUrl = data.urls.analysisJson;
+            const json = await withRetry(async () => {
+              const jr = await fetch(analysisUrl);
+              if (!jr.ok) throw new Error("Failed to fetch analysis JSON");
+              return jr.json();
+            }, cancelState);
+            if (!cancelState.cancelled) setAnalysisData(json);
           }
         }
       } catch (e) {
         console.error(e);
+        if (!cancelState.cancelled) setResultsError(true);
       }
     })();
     return () => {
-      cancelled = true;
+      cancelState.cancelled = true;
     };
-  }, [user, videoId, status]);
+  }, [user, videoId, status, retryNonce]);
 
-  return { docData, loading, urls, analysisData, status };
+  const retryAnalysisData = () => setRetryNonce((n) => n + 1);
+
+  return { docData, loading, urls, analysisData, status, resultsError, retryAnalysisData };
 }
