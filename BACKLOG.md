@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **FE-04** — confirmed root cause of missing shot log/rally map data; **BE-05** is a follow-up investigation, not yet confirmed.
+Recommended starting point: **BE-05** — the last remaining open ticket, tracking the suspected Render free-tier cold-start trigger behind the now-fixed FE-04.
 
 ---
 
@@ -70,16 +70,13 @@ _(none yet)_
   **Target File(s):** `worker/train/features_v3/*.npz`, `.bst-ref/`
   **Description:** Investigated and found this was already resolved — both directories were added to `.gitignore` back in commit `0d08575` ("chore: update .gitignore, remove old design doc from repo") and have zero git history (`git log --all` returns nothing for either path), so nothing is actually committed to relocate or exclude. Confirmed `.npz` features are regenerable via `extract_features.py` and never referenced at a fixed path by runtime code (`worker/app.py`'s Modal deploy explicitly excludes `train/features_v3/**`), and confirmed `.bst-ref/` is vendored third-party reference code (TemPose paper implementation) that should stay untracked. No code change — this ticket needed no PR.
 
+- [x] **[FE-04] Add retry/backoff and error-state UI to analysis results fetch**
+  **Target File(s):** `frontend/badminton-ai/src/features/analysis/hooks/useAnalysisData.ts`, `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/utils/retry.ts` (new)
+  **Description:** Added an exponential-backoff `withRetry` helper and wrapped both the backend results call and the E2 `analysisJson` fetch in it, replacing the hook's duplicate inline fetch with the existing `getVideoResults()` (which also fixed the stale `/api/v1` fallback URL bug). `useAnalysisData` now exposes `resultsError`/`retryAnalysisData`, and `AnalysisPage` shows a visible error banner with a Retry button — visible on both the Overview and Shot Stats tabs — instead of silently leaving the shot log/rally map/stat tiles blank on a transient failure. Merged via [PR #16](https://github.com/jameshualiu/shuttleye/pull/16).
+
 ---
 
 ## TODO
-
-### 🎨 Frontend (React/TS)
-
-- [ ] **[FE-04] Add retry/backoff and error-state UI to analysis results fetch**
-  **Target File(s):** `frontend/badminton-ai/src/features/analysis/hooks/useAnalysisData.ts`, `frontend/badminton-ai/src/features/analysis/videoService.ts`
-  **Impact vs. Effort:** High Impact / Medium Effort
-  **Description:** `useAnalysisData`'s results-fetching effect (`GET /videos/:id/results` + the E2 `analysisJson` fetch) runs exactly once with no retry and swallows failures via `console.error` only, so a single transient failure (e.g. a cold-started backend returning a 502) leaves `analysisData` permanently null for that session — silently blanking the shot log, rally map, tracking stat tiles, overlay toggle buttons, and Shot Stats tab, while Firestore-sourced fields (title, duration, `totalShots`) still render fine, producing a confusing partial page with no visible error. Add retry/backoff and a visible error/retry state; also fix the stale `http://localhost:3000/api/v1` fallback base URL (the backend actually mounts at `/api`, no `/v1`) and de-duplicate against the already-exported but unused `getVideoResults()` in `videoService.ts`.
 
 ### ⚙️ Backend (Node/Express)
 
