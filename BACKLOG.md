@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **REPO-01+02** — zero code risk, highest visibility-to-risk ratio of anything in this backlog.
+Recommended starting point: **REPO-01** — zero code risk, highest visibility-to-risk ratio of anything in this backlog.
 
 ---
 
@@ -68,12 +68,12 @@ _(none yet)_
 
 ### 📁 Repo & Documentation
 
-- [ ] **[REPO-01+02] Un-gitignore architecture docs & remove orphaned root `package.json`**
+- [ ] **[REPO-01] Un-gitignore architecture docs & remove orphaned root `package.json`**
   **Target File(s):** `.gitignore`, `data-flow.md`, `CLAUDE.md`, `package.json` (repo root), `package-lock.json` (repo root)
   **Impact vs. Effort:** High Impact / Low Effort
   **Description:** Two small, independent repo-hygiene fixes bundled into one ticket since both are trivial and zero-risk: (1) remove `data-flow.md` and `CLAUDE.md` from `.gitignore` and commit them — they're currently the best-written artifacts in the repo and invisible to anyone cloning it from GitHub; (2) delete the root-level `package.json`/`package-lock.json` (a stray `motion` dependency with no workspace config), folding the dependency into the frontend if it's still needed there.
 
-- [ ] **[REPO-03] Relocate/exclude training artifacts**
+- [ ] **[REPO-02] Relocate/exclude training artifacts**
   **Target File(s):** `worker/train/features_v3/*.npz`, `.bst-ref/`
   **Impact vs. Effort:** Medium Impact / Low-Medium Effort
   **Description:** 40+ committed `.npz` feature files and a reference-implementation folder bloat the repo; move to Git LFS, external storage, or `.gitignore`, but confirm nothing in `worker/train/*.py` depends on them being present at a fixed path before removing.
