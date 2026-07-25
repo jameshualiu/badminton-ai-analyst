@@ -63,7 +63,8 @@ function groupRallies(events: AnalysisShot[], fps: number): AnalysisShot[][] {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
-  const { docData, loading, urls, analysisData, status } = useAnalysisData(videoId);
+  const { docData, loading, urls, analysisData, status, resultsError, retryAnalysisData } =
+    useAnalysisData(videoId);
 
   const timeStore = useCurrentTimeStore();
   const [ov, setOv] = useState({ court: true, pose: true, shuttle: true });
@@ -292,6 +293,18 @@ export default function AnalysisPage() {
               </button>
             ))}
           </div>
+
+          {resultsError && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between gap-3 shrink-0">
+              <span>Couldn't load the full analysis data. Shot log, rally map, and stats may be missing.</span>
+              <button
+                onClick={retryAnalysisData}
+                className="text-[12px] font-semibold underline underline-offset-2 shrink-0 cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* ── OVERVIEW TAB ── */}
           {activeTab === "overview" && (
