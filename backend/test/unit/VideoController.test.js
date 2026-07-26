@@ -1,6 +1,9 @@
 const express = require('express');
 const request = require('supertest');
 
+jest.mock('@vercel/functions', () => ({ waitUntil: jest.fn() }));
+const { waitUntil } = require('@vercel/functions');
+
 const VideoController = require('../../src/controller/VideoController');
 const errorHandler = require('../../src/middleware/errorHandler');
 const AppError = require('../../src/utils/AppError');
@@ -30,6 +33,7 @@ describe('VideoController', () => {
   let app;
   const originalFetch = global.fetch;
   const originalWebhookUrl = process.env.MODAL_WEBHOOK_URL;
+  const originalVercel = process.env.VERCEL;
 
   beforeEach(() => {
     service = {
@@ -42,11 +46,15 @@ describe('VideoController', () => {
     };
     app = buildApp(service);
     process.env.MODAL_WEBHOOK_URL = 'https://modal.example/webhook';
+    delete process.env.VERCEL;
+    waitUntil.mockClear();
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     process.env.MODAL_WEBHOOK_URL = originalWebhookUrl;
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
   });
 
   describe('POST /init', () => {
@@ -137,6 +145,29 @@ describe('VideoController', () => {
 
       expect(res.status).toBe(200);
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('hands the webhook promise to waitUntil when running on Vercel', async () => {
+      process.env.VERCEL = '1';
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+      const res = await request(app).post('/video-1/complete').send();
+
+      expect(res.status).toBe(200);
+      expect(waitUntil).toHaveBeenCalledTimes(1);
+      expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+    });
+
+    it('does not call waitUntil when not on Vercel (persistent process)', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+      await request(app).post('/video-1/complete').send();
+
+      expect(waitUntil).not.toHaveBeenCalled();
     });
   });
 

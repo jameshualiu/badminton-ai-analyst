@@ -1,3 +1,4 @@
+const { waitUntil } = require('@vercel/functions');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const logger = require('../utils/logger');
@@ -39,8 +40,8 @@ class VideoController {
         if (videoData && videoData.input && videoData.input.e2Key) {
             logger.info({ videoId }, "Triggering Modal AI");
 
-            // Fire and forget (don't await so the user gets an instant response)
-            fetch(process.env.MODAL_WEBHOOK_URL, {
+            // Don't await, so the user gets an instant response.
+            const triggerPromise = fetch(process.env.MODAL_WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -60,6 +61,14 @@ class VideoController {
                 logger.error({ videoId, err }, "Modal trigger request failed");
                 await this.service.markFailed(userId, videoId, `Worker trigger error: ${err.message}`);
             });
+
+            // On Vercel serverless, the instance can be frozen the moment we send
+            // the response, killing the in-flight webhook (and its error handling).
+            // Hand the promise to the runtime so it stays alive until it settles.
+            // Locally/Docker the persistent process makes this unnecessary.
+            if (process.env.VERCEL) {
+                waitUntil(triggerPromise);
+            }
         }
     } catch (err) {
         logger.error({ videoId, err }, "Failed to fetch video for Modal trigger");
