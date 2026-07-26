@@ -1,8 +1,5 @@
 // Verifies the extracted Express app (src/app.js) wires up end-to-end.
 // Only Firebase is mocked; the real router/middleware/error-handler run.
-// uuid v13 is ESM-only and breaks Jest's CJS parser, so it's mocked (same
-// as VideoService.test.js) — it's pulled in transitively via the app chain.
-jest.mock('uuid', () => ({ v4: () => 'test-uuid' }));
 jest.mock('../../src/config/firebase', () => ({
   db: {
     collection: jest.fn(() => ({
