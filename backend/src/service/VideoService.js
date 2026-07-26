@@ -1,6 +1,6 @@
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const r2Client = require('../config/r2');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
@@ -12,7 +12,7 @@ class VideoService {
 
   // Step 1: Generate URL + Create DB Record
   async initializeUpload(userId, fileMeta) {
-    const videoId = uuidv4();
+    const videoId = randomUUID();
     const e2Key = `uploads/${userId}/${videoId}/${fileMeta.filename}`;
 
     // A. Generate Presigned PUT URL (valid for 1 hour)

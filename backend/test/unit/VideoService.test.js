@@ -2,7 +2,6 @@ jest.mock('../../src/config/r2', () => ({ send: jest.fn() }));
 jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest.fn(),
 }));
-jest.mock('uuid', () => ({ v4: () => 'test-video-id' }));
 
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const r2Client = require('../../src/config/r2');
