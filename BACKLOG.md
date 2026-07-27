@@ -8,7 +8,9 @@ Recommended starting point: **BE-06** — tear down Render now that BE-05 (the V
 
 ## IN PROGRESS
 
-_(none yet)_
+- [ ] **[WK-05] Correct hitter location & shuttle-in-court filtering**
+  **Target File(s):** `worker/pipeline.py`, `worker/tests/test_hitter_location.py` (new), `worker/tests/test_shuttle_in_court.py` (new)
+  **Description:** Rescues a previously-unmerged fix (was stranded on a local-only branch) for rally-map shot-location accuracy: `_shuttle_in_court` now uses a perspective-correct quad test with proportional x-padding instead of y-bounds only; `_player_sort_key` orders by homography-derived court-y (foot) to match BST's Top/Bottom convention; and new `_refine_locations_by_side` re-derives each hit's `location_m` from BST's reliable full-sequence `side` assignment instead of the single-frame hitter guess. Rebased onto current `main` (resolved conflicts against WK-01's BST fallback and WK-03's derived dims). 13 new mirror tests + full worker suite (37) pass. **PR [#19](https://github.com/jameshualiu/shuttleye/pull/19) open** — pending review/merge and a prod e2e re-run.
 
 ---
 
