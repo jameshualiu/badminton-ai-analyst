@@ -12,6 +12,10 @@ Recommended starting point: **BE-06** — tear down Render now that BE-05 (the V
   **Target File(s):** `worker/pipeline.py`, `worker/tests/test_hitter_location.py` (new), `worker/tests/test_shuttle_in_court.py` (new)
   **Description:** Rescues a previously-unmerged fix (was stranded on a local-only branch) for rally-map shot-location accuracy: `_shuttle_in_court` now uses a perspective-correct quad test with proportional x-padding instead of y-bounds only; `_player_sort_key` orders by homography-derived court-y (foot) to match BST's Top/Bottom convention; and new `_refine_locations_by_side` re-derives each hit's `location_m` from BST's reliable full-sequence `side` assignment instead of the single-frame hitter guess. Rebased onto current `main` (resolved conflicts against WK-01's BST fallback and WK-03's derived dims). 13 new mirror tests + full worker suite (37) pass. **PR [#19](https://github.com/jameshualiu/shuttleye/pull/19) open** — pending review/merge and a prod e2e re-run.
 
+- [ ] **[FE-05] Add light-mode variants for hover/border/mockup styling**
+  **Target File(s):** `frontend/badminton-ai/src/styles/tailwind.css`, `frontend/badminton-ai/src/components/Navbar.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoCard.tsx`, `frontend/badminton-ai/src/pages/DashboardPage.tsx`, `frontend/badminton-ai/src/pages/LandingPage.tsx`
+  **Description:** Rescues a previously-unmerged frontend fix (was stranded on a local-only branch) filling light-mode styling gaps: adds `dark:` variants so dark-only hover/border/red-text styles render visibly in light mode, refines the `.theme-ai-saas` light palette (pearl-grey background, softer border), and adds a `.mockup-dark` class applied to the landing-page app-preview panels so they stay dark regardless of site theme. Cherry-picked onto `main` (git auto-merged cleanly around REPO-04/FE-03; FE-03's video-chrome tokens verified intact). Lint (0 errors) + build pass. **PR [#20](https://github.com/jameshualiu/shuttleye/pull/20) open** — pending review/merge and a visual check in light mode.
+
 ---
 
 ## DONE
