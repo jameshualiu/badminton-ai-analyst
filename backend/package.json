@@ -20,7 +20,9 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
     "firebase-admin": "^13.6.1",
-    "pino": "^10.3.1"
+    "ioredis": "^5.11.1",
+    "pino": "^10.3.1",
+    "rate-limit-redis": "^6.0.0"
   },
   "devDependencies": {
     "jest": "^30.4.2",

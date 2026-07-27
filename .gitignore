@@ -5,6 +5,9 @@ build/
 .env
 .env.local
 .env.*
+# ...but do track example env files (no secrets)
+!.env.example
+!**/.env.example
 
 # Secrets & credentials
 serviceAccount.json
