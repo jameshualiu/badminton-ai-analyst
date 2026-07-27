@@ -7,6 +7,13 @@ from inference import BadmintonInference
 
 
 class BadmintonPipeline:
+    # Proportional x-padding applied around the court polygon when checking
+    # whether a tracked shuttle position is plausibly in-play. Proportional
+    # (rather than a flat pixel value) keeps tolerance consistent at both
+    # the near and far ends of an angled court.
+    SHUTTLE_COURT_PADDING_MIN_PX = 30.0
+    SHUTTLE_COURT_PADDING_FRAC = 0.15
+
     def __init__(self, inference_engine: BadmintonInference):
         self.engine = inference_engine
         self.geometry = None
@@ -43,6 +50,7 @@ class BadmintonPipeline:
         kp6 = self.geometry["court_keypoints_6"]
         quad = np.array([kp6[0], kp6[1], kp6[5], kp6[4]], dtype="float32")
         self.homography_matrix, _ = cv2.findHomography(quad, self.TARGET_CORNERS)
+        self.court_kp6 = kp6
 
         top_ys = [kp6[0][1], kp6[1][1]]
         bot_ys = [kp6[4][1], kp6[5][1]]
@@ -51,17 +59,70 @@ class BadmintonPipeline:
         print(f"[OK] Homography ready. Court y-bounds: {self.court_y_min_px:.0f}-{self.court_y_max_px:.0f}px")
 
     def _shuttle_in_court(self, pos):
+        """Return False if the shuttle position is implausibly far from the
+        court polygon (e.g. a stray shuttlecock on the floor outside the
+        sideline). Uses a perspective-correct quad test like _is_in_court,
+        with x-padding proportional to the court's width at that depth so
+        angled cameras aren't over- or under-filtered at the far/near end."""
         if pos is None:
             return False
         if not hasattr(self, 'court_y_min_px'):
             return True
-        return self.court_y_min_px <= pos[1] <= self.court_y_max_px
+
+        x, y = pos
+        if not (self.court_y_min_px <= y <= self.court_y_max_px):
+            return False
+
+        kp6 = getattr(self, 'court_kp6', None)
+        if not kp6:
+            return True
+
+        TL, TR = kp6[0], kp6[1]
+        BL, BR = kp6[4], kp6[5]
+
+        denom = BL[1] - TL[1]
+        if abs(denom) < 1:
+            return True
+        t = max(0.0, min(1.0, (y - TL[1]) / denom))
+        left_x = TL[0] + t * (BL[0] - TL[0])
+        right_x = TR[0] + t * (BR[0] - TR[0])
+
+        padding = max(self.SHUTTLE_COURT_PADDING_MIN_PX,
+                       self.SHUTTLE_COURT_PADDING_FRAC * (right_x - left_x))
+
+        return left_x - padding <= x <= right_x + padding
 
     def pixel_to_meters(self, x, y):
         if self.homography_matrix is None or x is None or y is None:
             return None
         point = np.array([[[x, y]]], dtype="float32")
         return cv2.perspectiveTransform(point, self.homography_matrix)[0][0].tolist()
+
+    def _foot_pixel(self, player: dict):
+        """Player's foot position in pixels: ankle midpoint, falling back to
+        box-bottom-center. Returns (None, None) if neither is available."""
+        sk = player.get("skeleton", [])
+        la = sk[15] if len(sk) > 15 else None
+        ra = sk[16] if len(sk) > 16 else None
+        if la and ra and (la[0] or la[1]) and (ra[0] or ra[1]):
+            return (la[0] + ra[0]) / 2, (la[1] + ra[1]) / 2
+        box = player.get("box", [])
+        if len(box) == 4:
+            return (box[0] + box[2]) / 2, box[3]
+        return None, None
+
+    def _player_sort_key(self, player: dict):
+        """Sort key for Top-before-Bottom ordering: court-y via homography,
+        falling back to raw pixel-y when the foot position or homography is
+        unavailable (matches the official BST reference's "Top before Bottom,
+        comparing court y-dim" criterion)."""
+        fx, fy = self._foot_pixel(player)
+        if fx is not None:
+            court = self.pixel_to_meters(fx, fy)
+            if court is not None:
+                return court[1]
+        box = player.get("box", [])
+        return box[1] if len(box) == 4 else 999
 
     def _is_in_court(self, player: dict, kp6: list, padding: float = 80.0) -> bool:
         skel = player.get("skeleton", [])
@@ -235,7 +296,7 @@ class BadmintonPipeline:
                 _filtered_counts[filtered_n] = _filtered_counts.get(filtered_n, 0) + 1
                 # Scale HD coords back to 512x288 so downstream code stays unchanged
                 players = [self._scale_player(p, 1.0 / sx, 1.0 / sy) for p in players]
-                players.sort(key=lambda p: p["box"][1] if len(p.get("box", [])) == 4 else 999)
+                players.sort(key=self._player_sort_key)
                 player_tracking.append({"frame": start_idx + i, "players": players})
 
             if start_idx % (pose_batch_size * 20) == 0 and start_idx > 0:
@@ -263,6 +324,10 @@ class BadmintonPipeline:
                 print(f"[bst] WARNING: classify_hits failed at runtime ({e}); "
                       f"falling back to LSTM/rule-based classification")
                 hits = self._classify_hits(hits, player_tracking, shuttle_traj, force_lstm=True)
+            # Re-derive hit locations from BST's reliable side assignment. No-op
+            # when side isn't set (e.g. the LSTM fallback path above), and kept
+            # outside the try so a refine error can't discard BST's classification.
+            hits = self._refine_locations_by_side(hits, player_tracking)
 
         shot_counts = dict(Counter(h["type"] for h in hits))
 
@@ -660,18 +725,7 @@ class BadmintonPipeline:
             # location_m from hitter's foot position — valid court surface point
             hitter = players_at_hit[hitter_idx] if players_at_hit else None
             if hitter:
-                sk = hitter.get("skeleton", [])
-                la = sk[15] if len(sk) > 15 else None
-                ra = sk[16] if len(sk) > 16 else None
-                if la and ra and (la[0] or la[1]) and (ra[0] or ra[1]):
-                    fx = (la[0] + ra[0]) / 2
-                    fy = (la[1] + ra[1]) / 2
-                elif len(hitter.get("box", [])) == 4:
-                    box = hitter["box"]
-                    fx = (box[0] + box[2]) / 2
-                    fy = box[3]
-                else:
-                    fx = fy = None
+                fx, fy = self._foot_pixel(hitter)
                 if fx is not None:
                     hit["location_m"] = self.pixel_to_meters(fx, fy)
 
@@ -700,6 +754,33 @@ class BadmintonPipeline:
             else:
                 hitter = players_at_hit[hitter_idx] if players_at_hit else None
                 hit["type"] = self._classify_shot_rules(f, shuttle_map, hitter)
+
+        return hits
+
+    def _refine_locations_by_side(self, hits, player_tracking):
+        """Re-derive location_m from BST's validated hitter `side` (Top ->
+        players_at_hit[0], Bottom -> players_at_hit[1]) -- BST's full-sequence
+        side assignment is far more reliable than _classify_hits' single-frame
+        x-distance hitter guess used to compute location_m."""
+        tracking_by_frame = {entry["frame"]: entry["players"] for entry in player_tracking}
+
+        for hit in hits:
+            side = hit.get("side")
+            if side not in ("Top", "Bottom"):
+                continue
+
+            players_at_hit = tracking_by_frame.get(hit["frame"], [])
+            target_idx = 0 if side == "Top" else 1
+            if len(players_at_hit) <= target_idx:
+                continue
+
+            fx, fy = self._foot_pixel(players_at_hit[target_idx])
+            if fx is None:
+                continue
+
+            loc = self.pixel_to_meters(fx, fy)
+            if loc is not None:
+                hit["location_m"] = loc
 
         return hits
 
