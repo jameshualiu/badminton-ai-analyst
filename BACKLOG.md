@@ -8,13 +8,7 @@ Recommended starting point: **BE-06** — tear down Render now that BE-05 (the V
 
 ## IN PROGRESS
 
-- [ ] **[WK-05] Correct hitter location & shuttle-in-court filtering**
-  **Target File(s):** `worker/pipeline.py`, `worker/tests/test_hitter_location.py` (new), `worker/tests/test_shuttle_in_court.py` (new)
-  **Description:** Rescues a previously-unmerged fix (was stranded on a local-only branch) for rally-map shot-location accuracy: `_shuttle_in_court` now uses a perspective-correct quad test with proportional x-padding instead of y-bounds only; `_player_sort_key` orders by homography-derived court-y (foot) to match BST's Top/Bottom convention; and new `_refine_locations_by_side` re-derives each hit's `location_m` from BST's reliable full-sequence `side` assignment instead of the single-frame hitter guess. Rebased onto current `main` (resolved conflicts against WK-01's BST fallback and WK-03's derived dims). 13 new mirror tests + full worker suite (37) pass. **PR [#19](https://github.com/jameshualiu/shuttleye/pull/19) open** — pending review/merge and a prod e2e re-run.
-
-- [ ] **[FE-05] Add light-mode variants for hover/border/mockup styling**
-  **Target File(s):** `frontend/badminton-ai/src/styles/tailwind.css`, `frontend/badminton-ai/src/components/Navbar.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoCard.tsx`, `frontend/badminton-ai/src/pages/DashboardPage.tsx`, `frontend/badminton-ai/src/pages/LandingPage.tsx`
-  **Description:** Rescues a previously-unmerged frontend fix (was stranded on a local-only branch) filling light-mode styling gaps: adds `dark:` variants so dark-only hover/border/red-text styles render visibly in light mode, refines the `.theme-ai-saas` light palette (pearl-grey background, softer border), and adds a `.mockup-dark` class applied to the landing-page app-preview panels so they stay dark regardless of site theme. Cherry-picked onto `main` (git auto-merged cleanly around REPO-04/FE-03; FE-03's video-chrome tokens verified intact). Lint (0 errors) + build pass. **PR [#20](https://github.com/jameshualiu/shuttleye/pull/20) open** — pending review/merge and a visual check in light mode.
+_(none yet)_
 
 ---
 
@@ -83,6 +77,14 @@ Recommended starting point: **BE-06** — tear down Render now that BE-05 (the V
 - [x] **[BE-05] Migrate backend from Render to Vercel serverless**
   **Target File(s):** `backend/src/app.js` (new), `backend/server.js`, `backend/api/index.js` (new), `backend/vercel.json` (new), `backend/src/controller/VideoController.js`, `backend/src/service/VideoService.js`, `backend/package.json`, `backend/test/unit/app.test.js` (new), `backend/test/unit/VideoController.test.js`, `backend/test/unit/VideoService.test.js`
   **Description:** Extracted the Express app into an importable `src/app.js` (no `listen()`), served on Vercel via an `api/index.js` serverless entry + catch-all `vercel.json` rewrite; `server.js` stays the local/Docker entry. Wrapped the fire-and-forget Modal webhook in `waitUntil()` from `@vercel/functions` (guarded by `process.env.VERCEL`) so serverless can't freeze the instance before the trigger + its `markFailed` error handling complete; added `trust proxy` and tests (`app.test.js` wiring + `waitUntil` behavior). Also dropped the ESM-only `uuid` dep for native `crypto.randomUUID()` — `require('uuid')` threw `ERR_REQUIRE_ESM` and crashed the function on Vercel's runtime (hidden locally by uuid-mocking tests). Merged via [PR #17](https://github.com/jameshualiu/shuttleye/pull/17) + uuid hotfix [PR #18](https://github.com/jameshualiu/shuttleye/pull/18). Verified end-to-end in production (health, JWT auth, R2 presign, webhook `queued→failed` transition, full upload via UI). Cutover also required adding the frontend's serving origin (`https://shuttleye.vercel.app`) to the E2/R2 bucket CORS allowlist — a latent config gap, not a code issue.
+
+- [x] **[WK-05] Correct hitter location & shuttle-in-court filtering**
+  **Target File(s):** `worker/pipeline.py`, `worker/tests/test_hitter_location.py` (new), `worker/tests/test_shuttle_in_court.py` (new)
+  **Description:** Rescued a previously-unmerged fix (stranded on a local-only branch) for rally-map shot-location accuracy: `_shuttle_in_court` uses a perspective-correct quad test with proportional x-padding (was y-bounds only); `_player_sort_key` orders by homography-derived court-y to match BST's Top/Bottom convention; and new `_refine_locations_by_side` re-derives each hit's `location_m` from BST's reliable full-sequence `side`. Cherry-picked onto `main` (resolved conflicts against WK-01's BST fallback + WK-03's derived dims); 13 new mirror tests + full worker suite (37) pass. Merged via [PR #19](https://github.com/jameshualiu/shuttleye/pull/19). Still recommended: a prod e2e re-run on a real video (the sort-order change affects BST's input).
+
+- [x] **[FE-05] Add light-mode variants for hover/border/mockup styling**
+  **Target File(s):** `frontend/badminton-ai/src/styles/tailwind.css`, `frontend/badminton-ai/src/components/Navbar.tsx`, `frontend/badminton-ai/src/features/analysis/components/VideoCard.tsx`, `frontend/badminton-ai/src/pages/DashboardPage.tsx`, `frontend/badminton-ai/src/pages/LandingPage.tsx`
+  **Description:** Rescued a previously-unmerged frontend fix (stranded on a local-only branch) filling light-mode styling gaps: `dark:` variants so dark-only hover/border/red-text styles render visibly in light mode, a refined `.theme-ai-saas` light palette (pearl-grey background, softer border), and a `.mockup-dark` class on the landing-page app-preview panels so they stay dark regardless of site theme. Cherry-picked onto `main` (auto-merged cleanly around REPO-04/FE-03; FE-03's video-chrome tokens verified intact); lint (0 errors) + build pass. Merged via [PR #20](https://github.com/jameshualiu/shuttleye/pull/20).
 
 ---
 
