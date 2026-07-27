@@ -19,11 +19,11 @@ export function VideoCard({ video, onClick, onDelete }: VideoCardProps) {
   return (
     <motion.button
       onClick={onClick}
-      className="group relative bg-card/40 border border-border/40 rounded-2xl overflow-hidden text-left hover:border-primary/40 transition-all backdrop-blur-sm"
+      className="group relative bg-white dark:bg-card/40 border border-slate-200 dark:border-border/40 rounded-2xl overflow-hidden text-left hover:border-primary/40 transition-all backdrop-blur-sm"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >
-      <div className="relative aspect-video overflow-hidden bg-background/40">
+      <div className="relative aspect-video overflow-hidden bg-slate-100 dark:bg-background/40">
         {video.thumbnail ? (
           <img
             src={video.thumbnail}
@@ -60,7 +60,7 @@ export function VideoCard({ video, onClick, onDelete }: VideoCardProps) {
           </div>
 
           {video.status && (
-            <div className="ml-auto text-xs px-2 py-1 rounded-full border border-border/40 bg-background/30 text-muted-foreground">
+            <div className="ml-auto text-xs px-2 py-1 rounded-full border border-slate-200 dark:border-border/40 bg-slate-100 dark:bg-background/30 text-muted-foreground">
               {video.status}
             </div>
           )}

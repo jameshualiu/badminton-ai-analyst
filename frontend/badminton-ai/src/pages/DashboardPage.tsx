@@ -158,7 +158,7 @@ export default function DashboardPage() {
 
   const statusBadgeClass = (s: VideoStatus | undefined) => {
     if (s === "done") return "bg-primary/10 text-primary";
-    if (s === "failed") return "bg-red-500/10 text-red-400/80";
+    if (s === "failed") return "bg-red-500/10 text-red-500 dark:text-red-400/80";
     return "bg-foreground/6 text-muted-foreground";
   };
 
@@ -293,7 +293,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="mt-3 flex opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] font-medium text-red-400 transition-all hover:bg-red-500/20 hover:border-red-500/40"
+                        className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] font-medium text-red-500 dark:text-red-400 transition-all hover:bg-red-500/20 hover:border-red-500/40"
                         onClick={(e) => handleDelete(doc.id, e)}
                       >
                         Delete

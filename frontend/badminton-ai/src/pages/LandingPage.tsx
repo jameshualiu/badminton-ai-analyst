@@ -21,7 +21,7 @@ function WindowChrome({ title, right }: { title: string; right?: React.ReactNode
 
 function UploadPanel() {
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Upload match footage" />
             <div className="m-4 border-2 border-dashed border-primary/25 rounded-xl p-6 text-center bg-primary/[0.04]">
                 <div className="flex justify-center mb-2.5 text-primary">
@@ -45,7 +45,7 @@ function ProcessingPanel() {
         { label: "Shot classification", pct: 0,   waiting: true },
     ];
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Analysing footage…" />
             <div className="p-4 space-y-3">
                 <div className="bg-black rounded-lg h-32 relative overflow-hidden">
@@ -85,7 +85,7 @@ function ResultsPanel() {
         { t: "0:21", color: "#8b5cf6", name: "Net",   pos: "3.2, 3.8" },
     ];
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Results" right={<span className="text-primary font-bold">47 shots</span>} />
             <div className="p-3.5 space-y-2">
                 <div className="grid grid-cols-3 gap-2">
@@ -121,7 +121,7 @@ function ShotLogPanel() {
         { t: "0:28", color: "var(--color-primary)", name: "Clear", pos: "1.8, 1.9" },
     ];
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Shot Log" right={<span className="text-primary font-bold">47</span>} />
             <div className="p-3">
                 {rows.map((r) => (
@@ -145,7 +145,7 @@ function HeatmapPanel() {
         { color: "#10b981", label: "Drop",  w: "28%", n: 6  },
     ];
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Shot Heatmap" />
             <div className="p-3 flex gap-3 items-start">
                 <svg viewBox="0 0 130 272" className="w-[72px] h-[150px] flex-shrink-0">
@@ -187,7 +187,7 @@ function RallyPanel() {
     const dots1 = ["var(--color-primary)", "#f59e0b", "#10b981", "var(--color-primary)", "#f59e0b", "#8b5cf6", "var(--color-primary)", "#f59e0b"];
     const dots2 = ["var(--color-primary)", "#10b981", "var(--color-primary)", "#f59e0b", "#8b5cf6", "var(--color-primary)"];
     return (
-        <div className="bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+        <div className="mockup-dark text-foreground bg-card/70 backdrop-blur-md border border-primary/25 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <WindowChrome title="Rally Analysis" right={<span>8 rallies</span>} />
             <div className="p-3 space-y-3">
                 <div className="grid grid-cols-4 gap-1.5">

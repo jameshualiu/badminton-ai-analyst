@@ -230,7 +230,7 @@
 
 /* Theme: AI SaaS — Lugia (icy blue-white, pearl, deep navy) */
 .theme-ai-saas {
-  --background: #F8F9FC;        /* soft off-white, barely cool */
+  --background: #EEF2F7;        /* cool pearl grey — distinct from white cards */
   --foreground: #0C1E33;        /* deep navy text */
 
   --card: #ffffff;
@@ -253,8 +253,8 @@
 
   --destructive: #EF4444;
 
-  --border: #E2E8F0;
-  --input: #E2E8F0;
+  --border: #D6E0EC;
+  --input: #D6E0EC;
   --ring: #2563EB;
 
   --glow: #BAD9F5;              /* Lugia wing — soft blue glow */
@@ -322,6 +322,38 @@
   --sidebar-accent-foreground: #D8E8F5;
   --sidebar-border: #142233;
   --sidebar-ring: #3B82F6;
+}
+
+/* Fixed dark "screenshot" frame for landing page UI mockups —
+   stays dark regardless of site theme so the internal subtle
+   white overlays remain visible. */
+.mockup-dark {
+  --background: #07101A;
+  --foreground: #D8E8F5;
+
+  --card: #0C1A27;
+  --card-foreground: #D8E8F5;
+
+  --popover: #0C1A27;
+  --popover-foreground: #D8E8F5;
+
+  --primary: #3B82F6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #112030;
+  --secondary-foreground: #93C5FD;
+
+  --muted: #112030;
+  --muted-foreground: #5A9EC9;
+
+  --accent: #112030;
+  --accent-foreground: #93C5FD;
+
+  --destructive: #F87171;
+
+  --border: #142233;
+  --input: #142233;
+  --ring: #3B82F6;
 }
 
 /* Dot-grid background adapts to dark mode */
