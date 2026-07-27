@@ -2,7 +2,7 @@
 
 Organized into four tracks: repo/documentation hygiene, backend, frontend, and worker.
 
-Recommended starting point: **BE-05** — migrate the backend off Render onto Vercel to kill the cold-start class of bug (the suspected FE-04 trigger) and consolidate hosting; **BE-06** is the Render teardown, gated on BE-05 being verified in prod.
+Recommended starting point: **BE-06** — tear down Render now that BE-05 (the Vercel migration) is verified in prod; **BE-07** is a follow-up to make rate limiting serverless-safe.
 
 ---
 
@@ -74,16 +74,15 @@ _(none yet)_
   **Target File(s):** `frontend/badminton-ai/src/features/analysis/hooks/useAnalysisData.ts`, `frontend/badminton-ai/src/pages/AnalysisPage.tsx`, `frontend/badminton-ai/src/utils/retry.ts` (new)
   **Description:** Added an exponential-backoff `withRetry` helper and wrapped both the backend results call and the E2 `analysisJson` fetch in it, replacing the hook's duplicate inline fetch with the existing `getVideoResults()` (which also fixed the stale `/api/v1` fallback URL bug). `useAnalysisData` now exposes `resultsError`/`retryAnalysisData`, and `AnalysisPage` shows a visible error banner with a Retry button — visible on both the Overview and Shot Stats tabs — instead of silently leaving the shot log/rally map/stat tiles blank on a transient failure. Merged via [PR #16](https://github.com/jameshualiu/shuttleye/pull/16).
 
+- [x] **[BE-05] Migrate backend from Render to Vercel serverless**
+  **Target File(s):** `backend/src/app.js` (new), `backend/server.js`, `backend/api/index.js` (new), `backend/vercel.json` (new), `backend/src/controller/VideoController.js`, `backend/src/service/VideoService.js`, `backend/package.json`, `backend/test/unit/app.test.js` (new), `backend/test/unit/VideoController.test.js`, `backend/test/unit/VideoService.test.js`
+  **Description:** Extracted the Express app into an importable `src/app.js` (no `listen()`), served on Vercel via an `api/index.js` serverless entry + catch-all `vercel.json` rewrite; `server.js` stays the local/Docker entry. Wrapped the fire-and-forget Modal webhook in `waitUntil()` from `@vercel/functions` (guarded by `process.env.VERCEL`) so serverless can't freeze the instance before the trigger + its `markFailed` error handling complete; added `trust proxy` and tests (`app.test.js` wiring + `waitUntil` behavior). Also dropped the ESM-only `uuid` dep for native `crypto.randomUUID()` — `require('uuid')` threw `ERR_REQUIRE_ESM` and crashed the function on Vercel's runtime (hidden locally by uuid-mocking tests). Merged via [PR #17](https://github.com/jameshualiu/shuttleye/pull/17) + uuid hotfix [PR #18](https://github.com/jameshualiu/shuttleye/pull/18). Verified end-to-end in production (health, JWT auth, R2 presign, webhook `queued→failed` transition, full upload via UI). Cutover also required adding the frontend's serving origin (`https://shuttleye.vercel.app`) to the E2/R2 bucket CORS allowlist — a latent config gap, not a code issue.
+
 ---
 
 ## TODO
 
 ### ⚙️ Backend (Node/Express)
-
-- [ ] **[BE-05] Migrate backend from Render to Vercel serverless**
-  **Target File(s):** `backend/` (Express entry point + new `vercel.json`/`api/` handler), `backend/src/controller/VideoController.js`, `frontend/badminton-ai/.env.local` (`VITE_API_BASE_URL`), Vercel project env vars
-  **Impact vs. Effort:** High Impact / Medium Effort
-  **Description:** Consolidate hosting onto Vercel (which already serves the frontend) to eliminate Render free-tier cold starts — the suspected FE-04 trigger, where the backend spins down after ~15 min idle and cold-boots (30s–2min) on the next request, returning a 502. The backend is a clean serverless fit: stateless, never touches video bytes (uploads go browser↔E2 directly via presigned URLs), all operations sub-second JSON. Work: adapt the Express app for Vercel (`@vercel/node` wrapper or restructure into `api/` handlers), add `vercel.json`, port the env vars (`FIREBASE_*`, `E2_*`, `MODAL_WEBHOOK_URL`) into the Vercel project, and repoint the frontend's `VITE_API_BASE_URL` at the new backend URL. **Correctness-critical:** the Modal trigger in `completeUpload` is fire-and-forget (un-awaited `fetch`, [VideoController.js:43](backend/src/controller/VideoController.js#L43)); on serverless the instance can be frozen the moment the response returns, so the webhook — and its `.catch()`/`markFailed` error handling — may silently never run. Wrap that fetch in `waitUntil()` from `@vercel/functions` so the runtime keeps the instance alive until it settles, without blocking the instant `{ status: "queued" }` response. (This one line only works on Vercel, so it's inseparable from the migration.)
 
 - [ ] **[BE-06] Decommission Render after Vercel cutover is verified**
   **Target File(s):** `render.yaml`, Render dashboard (tear down the web service)
