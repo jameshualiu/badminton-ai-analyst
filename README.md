@@ -29,14 +29,9 @@ A full-stack platform that turns raw badminton footage into actionable, stroke-l
 
 ## 📸 Screenshots
 
-> 📸 *Screenshots coming soon.*
-
-<!-- Drop dashboard.png and analysis.png in .github/assets/ and uncomment:
-
 | Dashboard | Analysis |
 |-----------|----------|
 | ![Dashboard — video list with live status](.github/assets/dashboard.png) | ![Analysis — shot heatmap on the court](.github/assets/analysis.png) |
--->
 
 ---
 
