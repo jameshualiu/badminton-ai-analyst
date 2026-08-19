@@ -2,7 +2,10 @@
 
 Wraps the pretrained BST-CG-AP checkpoint (25 merged ShuttleSet classes,
 "between 2 hits with max limits" segmentation, seq_len=100). Replaces the
-6-class LSTM shot classifier.
+6-class LSTM shot classifier -- BST's raw 12-class (+Unknown) output is
+collapsed onto that same 6-class taxonomy via PRODUCT_TYPE below, since
+that's what the frontend and analysis.json schema expect; serve classes
+have no home in the 6-class taxonomy and are dropped from the output.
 
 Input construction mirrors the official preprocessing
 (prepare_train_on_shuttleset.py, MIT License):
@@ -49,6 +52,29 @@ TYPE_EN = {
     "勾球": "Cross-court Net",
     "發短球": "Short Serve",
     "發長球": "Long Serve",
+}
+
+# Collapses BST's 12-class TYPE_EN vocabulary onto the product's 6-class
+# taxonomy (Clear/Smash/Drop/Drive/Net/Lob) that the frontend (shotUtils.ts
+# SHOT_COLORS) and analysis.json schema (data-flow.md) expect. TYPE_EN itself
+# stays untouched -- it's still needed at full granularity to score BST
+# against ShuttleSet ground truth. None = drop the hit: BST's two serve
+# classes aren't part of this taxonomy, consistent with hit-detection
+# already excluding serves from its own ground truth/training labels
+# upstream (see train/extract_features.py's SERVICE_TYPES_ZH).
+PRODUCT_TYPE = {
+    "Net Drop": "Net",
+    "Block": "Net",
+    "Smash": "Smash",
+    "Lift": "Lob",
+    "Clear": "Clear",
+    "Drive": "Drive",
+    "Drop": "Drop",
+    "Push": "Drive",
+    "Net Kill": "Net",
+    "Cross-court Net": "Net",
+    "Short Serve": None,
+    "Long Serve": None,
 }
 
 
@@ -210,9 +236,13 @@ class BSTStrokeClassifierAdapter:
             else:
                 side = "Top" if idx <= 12 else "Bottom"
                 zh = MERGED_TYPES_ZH[(idx - 1) % 12]
-                hit["type"] = TYPE_EN[zh]
+                hit["type"] = PRODUCT_TYPE[TYPE_EN[zh]]
             hit["side"] = side
             hit["typeConfidence"] = round(conf, 3)
+
+        # Drop serve-classified hits -- PRODUCT_TYPE maps them to None (see
+        # comment above PRODUCT_TYPE for why).
+        hits = [h for h in hits if h["type"] is not None]
 
         counts = {}
         for h in hits:
