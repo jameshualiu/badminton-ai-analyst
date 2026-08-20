@@ -1,7 +1,10 @@
+import hmac
 import modal
 import os
 import json
+import uuid
 from pathlib import Path
+from fastapi import Header, HTTPException
 
 # 1. Define the Modal App
 app = modal.App("badminton-ai-worker")
@@ -46,6 +49,30 @@ worker_image = (
 models_volume = modal.Volume.from_name("badminton-models", create_if_missing=True)
 MODELS_DIR = Path("/models")
 
+
+def _validate_webhook_secret(authorization: str | None, expected_secret: str | None) -> bool:
+    """Constant-time check of an `Authorization: Bearer <token>` header."""
+    if not authorization or not expected_secret:
+        return False
+    scheme, _, token = authorization.partition(" ")
+    if scheme != "Bearer" or not token:
+        return False
+    return hmac.compare_digest(token, expected_secret)
+
+
+def _validate_video_e2_key(video_e2_key: str, user_id: str) -> bool:
+    """Reject any E2 key not scoped to the requesting user's upload prefix."""
+    return isinstance(video_e2_key, str) and video_e2_key.startswith(f"uploads/{user_id}/")
+
+
+def _validate_video_id(video_id: str) -> bool:
+    """Reject anything that isn't a well-formed UUID (real ids are crypto.randomUUID())."""
+    try:
+        uuid.UUID(video_id)
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
 @app.function(
     image=worker_image,
     volumes={MODELS_DIR: models_volume},
@@ -54,14 +81,22 @@ MODELS_DIR = Path("/models")
     timeout=1200
 )
 @modal.fastapi_endpoint(method="POST")
-def process_badminton_video(data: dict):
+def process_badminton_video(data: dict, authorization: str = Header(default=None)):
     """
     Webhook entrypoint: Receives video details and starts analysis.
     """
+    if not _validate_webhook_secret(authorization, os.environ.get("MODAL_WEBHOOK_SECRET")):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     video_id = data["videoId"]
     user_id = data["userId"]
     video_e2_key = data["videoE2Key"]
-    
+
+    if not _validate_video_id(video_id):
+        raise HTTPException(status_code=400, detail="Malformed videoId")
+    if not _validate_video_e2_key(video_e2_key, user_id):
+        raise HTTPException(status_code=403, detail="videoE2Key does not match the requesting user")
+
     import boto3
     import firebase_admin
     from firebase_admin import credentials, firestore
