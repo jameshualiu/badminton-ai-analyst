@@ -91,7 +91,7 @@ describe('VideoController', () => {
 
   describe('POST /:videoId/complete', () => {
     it('marks the upload complete and responds immediately without waiting on the webhook', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       let resolveFetch;
       global.fetch = jest.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
@@ -110,7 +110,7 @@ describe('VideoController', () => {
     });
 
     it('sends the shared-secret bearer token on the webhook request', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockResolvedValue({ ok: true });
 
@@ -126,7 +126,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed when the webhook responds non-OK', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, text: () => Promise.resolve('boom') });
 
@@ -141,7 +141,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed when the webhook request itself throws', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
 
@@ -156,7 +156,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed instead of leaving it stuck queued when it has no e2Key on record', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: null });
       global.fetch = jest.fn();
 
@@ -172,7 +172,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed instead of leaving it stuck queued when the video record itself is missing', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue(null);
       global.fetch = jest.fn();
 
@@ -187,7 +187,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed instead of leaving it stuck queued when repo.getVideo rejects', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockRejectedValue(new Error('firestore unavailable'));
       global.fetch = jest.fn();
 
@@ -203,7 +203,7 @@ describe('VideoController', () => {
     });
 
     it('sends an AbortSignal on the webhook fetch so a hung connection cannot wait forever', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockResolvedValue({ ok: true });
 
@@ -217,7 +217,7 @@ describe('VideoController', () => {
     });
 
     it('marks the video failed with a timeout-specific message when the webhook request aborts', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       const abortError = new Error('The operation was aborted');
       abortError.name = 'TimeoutError';
@@ -233,9 +233,21 @@ describe('VideoController', () => {
       );
     });
 
+    it('does not fire a second webhook trigger for a video already queued/running/done', async () => {
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: true, status: 'running' });
+      global.fetch = jest.fn();
+
+      const res = await request(app).post('/video-1/complete').send();
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ status: 'running' });
+      expect(service.repo.getVideo).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
     it('hands the webhook promise to waitUntil when running on Vercel', async () => {
       process.env.VERCEL = '1';
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockResolvedValue({ ok: true });
 
@@ -247,7 +259,7 @@ describe('VideoController', () => {
     });
 
     it('does not call waitUntil when not on Vercel (persistent process)', async () => {
-      service.completeUpload.mockResolvedValue({ success: true });
+      service.completeUpload.mockResolvedValue({ success: true, alreadyProcessed: false, status: 'queued' });
       service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
       global.fetch = jest.fn().mockResolvedValue({ ok: true });
 

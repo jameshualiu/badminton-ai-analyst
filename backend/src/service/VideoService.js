@@ -40,9 +40,18 @@ class VideoService {
 
   // Step 2: Mark upload as complete
   async completeUpload(userId, videoId) {
+    // Idempotency guard: a double-click, client retry-on-timeout, or replayed
+    // request must not fire a second GPU trigger for a video already in
+    // flight or finished. `failed` is deliberately not blocked -- it's a
+    // legitimate retry path.
+    const videoData = await this.repo.getVideo(userId, videoId);
+    if (videoData && ['queued', 'running', 'done'].includes(videoData.status)) {
+      return { success: true, videoId, alreadyProcessed: true, status: videoData.status };
+    }
+
     // Mark as queued so the Python worker picks it up
     await this.repo.updateStatus(userId, videoId, 'queued');
-    return { success: true, videoId };
+    return { success: true, videoId, alreadyProcessed: false, status: 'queued' };
   }
 
   async getResultsUrls(userId, videoId) {
