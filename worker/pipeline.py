@@ -233,12 +233,13 @@ class BadmintonPipeline:
     # Main entry point
     # -------------------------------------------------------------------------
 
-    def process_video(self, video_path, tracknet_batch_size=8, pose_batch_size=16, limit_frames=1800):
+    def process_video(self, video_path, tracknet_batch_size=8, pose_batch_size=16, limit_frames=None):
         self.setup_homography(video_path)
 
         vr = VideoReader(video_path, ctx=cpu(0), width=512, height=288)
         fps = vr.get_avg_fps()
         total_frames = min(len(vr), limit_frames) if limit_frames else len(vr)
+        truncated = bool(limit_frames) and len(vr) > limit_frames
 
         print(f"[start] Starting analysis ({total_frames} frames @ {fps:.1f} fps)...")
 
@@ -336,7 +337,8 @@ class BadmintonPipeline:
                 "durationSec": total_frames / (fps if fps > 0 else 30),
                 "totalShots": len(hits),
                 "shotCounts": shot_counts,
-                "resolution": [SD_W, SD_H]
+                "resolution": [SD_W, SD_H],
+                "truncated": truncated
             },
             "geometry": self.geometry,
             "events": hits,

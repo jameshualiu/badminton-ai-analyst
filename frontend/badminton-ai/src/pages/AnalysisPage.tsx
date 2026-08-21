@@ -275,6 +275,11 @@ export default function AnalysisPage() {
                 </div>
               )}
             </div>
+            {analysisData?.summary.truncated && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 shrink-0">
+                Truncated — showing a partial result
+              </span>
+            )}
           </div>
 
           {/* Tabs */}

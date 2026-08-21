@@ -37,6 +37,7 @@ export interface AnalysisData {
         totalShots: number;
         shotCounts: Record<string, number>;
         resolution: [number, number];
+        truncated?: boolean;
     };
     geometry: {
         court: [number, number][] | null;
