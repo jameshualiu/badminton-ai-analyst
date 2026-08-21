@@ -31,6 +31,9 @@ When a video reaches `done`, the user navigates to `AnalysisPage`. It calls `get
 
 The worker runs as a Modal `fastapi_endpoint` on an NVIDIA T4 GPU with a 20-minute timeout. It receives `{ videoId, userId, videoE2Key }` from the backend webhook.
 
+**Processing-length constraint (WK-09)**
+There is no artificial frame cap — `process_video()` processes the full video by default. The real constraint on how long a match can be is the Modal function's own 20-minute (`timeout=1200`) wall-clock limit covering download + model loading + the full pipeline + upload; a video that doesn't finish within that window fails the request rather than being silently truncated. If a caller does pass an explicit `limit_frames`, `analysis.json`'s `summary.truncated` is set `true` so the frontend can surface that the result is a partial prefix.
+
 ### Model loading
 
 Five models are resolved from a persistent Modal Volume (with R2 as a fallback if missing):
@@ -112,7 +115,8 @@ If the LSTM is available, a 31-frame window (15 before + hit + 15 after) is buil
     "durationSec": 60.0,
     "totalShots": 42,
     "shotCounts": { "Clear": 12, "Smash": 8, "Drop": 7, "Drive": 6, "Net": 5, "Lob": 4 },
-    "resolution": [512, 288]
+    "resolution": [512, 288],
+    "truncated": false
   },
   "geometry": {
     "court": [[x,y], ...],
