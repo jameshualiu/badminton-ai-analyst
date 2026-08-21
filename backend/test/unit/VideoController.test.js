@@ -155,7 +155,7 @@ describe('VideoController', () => {
       );
     });
 
-    it('does not call the webhook when the video has no e2Key on record', async () => {
+    it('marks the video failed instead of leaving it stuck queued when it has no e2Key on record', async () => {
       service.completeUpload.mockResolvedValue({ success: true });
       service.repo.getVideo.mockResolvedValue({ input: null });
       global.fetch = jest.fn();
@@ -164,6 +164,73 @@ describe('VideoController', () => {
 
       expect(res.status).toBe(200);
       expect(global.fetch).not.toHaveBeenCalled();
+      expect(service.markFailed).toHaveBeenCalledWith(
+        'user-1',
+        'video-1',
+        expect.stringContaining('e2Key')
+      );
+    });
+
+    it('marks the video failed instead of leaving it stuck queued when the video record itself is missing', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue(null);
+      global.fetch = jest.fn();
+
+      await request(app).post('/video-1/complete').send();
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(service.markFailed).toHaveBeenCalledWith(
+        'user-1',
+        'video-1',
+        expect.stringContaining('e2Key')
+      );
+    });
+
+    it('marks the video failed instead of leaving it stuck queued when repo.getVideo rejects', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockRejectedValue(new Error('firestore unavailable'));
+      global.fetch = jest.fn();
+
+      const res = await request(app).post('/video-1/complete').send();
+
+      expect(res.status).toBe(200);
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(service.markFailed).toHaveBeenCalledWith(
+        'user-1',
+        'video-1',
+        expect.stringContaining('firestore unavailable')
+      );
+    });
+
+    it('sends an AbortSignal on the webhook fetch so a hung connection cannot wait forever', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+      await request(app).post('/video-1/complete').send();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://modal.example/webhook',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+
+    it('marks the video failed with a timeout-specific message when the webhook request aborts', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'TimeoutError';
+      global.fetch = jest.fn().mockRejectedValue(abortError);
+
+      await request(app).post('/video-1/complete').send();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(service.markFailed).toHaveBeenCalledWith(
+        'user-1',
+        'video-1',
+        expect.stringContaining('timed out')
+      );
     });
 
     it('hands the webhook promise to waitUntil when running on Vercel', async () => {
