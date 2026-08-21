@@ -43,7 +43,10 @@ class VideoController {
             // Don't await, so the user gets an instant response.
             const triggerPromise = fetch(process.env.MODAL_WEBHOOK_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.MODAL_WEBHOOK_SECRET}`
+                },
                 body: JSON.stringify({
                     videoId: videoId,
                     userId: userId,
