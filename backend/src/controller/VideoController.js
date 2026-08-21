@@ -51,7 +51,14 @@ class VideoController {
                     videoId: videoId,
                     userId: userId,
                     videoE2Key: videoData.input.e2Key
-                })
+                }),
+                // The Modal endpoint runs the full pipeline synchronously before
+                // responding, so this can legitimately take up to its own 20-minute
+                // (timeout=1200) limit for a long video. 21 minutes gives it that
+                // full window plus buffer -- this signal is a backstop for a
+                // connection-level hang (request never reaching Modal at all), not
+                // a bound on normal processing time.
+                signal: AbortSignal.timeout(21 * 60 * 1000)
             })
             .then(async (response) => {
                 if (!response.ok) {
@@ -62,7 +69,10 @@ class VideoController {
             })
             .catch(async (err) => {
                 logger.error({ videoId, err }, "Modal trigger request failed");
-                await this.service.markFailed(userId, videoId, `Worker trigger error: ${err.message}`);
+                const message = err.name === 'AbortError' || err.name === 'TimeoutError'
+                    ? 'Worker trigger timed out'
+                    : `Worker trigger error: ${err.message}`;
+                await this.service.markFailed(userId, videoId, message);
             });
 
             // On Vercel serverless, the instance can be frozen the moment we send
@@ -72,9 +82,13 @@ class VideoController {
             if (process.env.VERCEL) {
                 waitUntil(triggerPromise);
             }
+        } else {
+            logger.error({ videoId }, "Video record missing input.e2Key; cannot trigger Modal AI");
+            await this.service.markFailed(userId, videoId, 'Video record is missing its upload location (e2Key)');
         }
     } catch (err) {
         logger.error({ videoId, err }, "Failed to fetch video for Modal trigger");
+        await this.service.markFailed(userId, videoId, `Failed to read video record: ${err.message}`);
     }
 
     res.json({ status: 'queued' });
