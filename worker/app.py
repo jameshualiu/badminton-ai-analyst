@@ -199,6 +199,9 @@ def process_badminton_video(data: dict):
             bst_path=resolved_paths.get("bst"),
         )
         pipeline = BadmintonPipeline(inference)
+        # No frame cap (WK-09): the real constraint on processing length is
+        # this function's own timeout=1200 (20 min) above, not an arbitrary
+        # frame count.
         results = pipeline.process_video(local_video)
         
         # Step 5: Save analysis.json and Upload back to E2
