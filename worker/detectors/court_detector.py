@@ -7,7 +7,15 @@ from typing import Optional
 
 
 def _load_model(weights_path: str, device: str):
-    """Load a full-model .pth/.pt file (not a state dict)."""
+    """Load a full-model .pth/.pt file (not a state dict).
+
+    weights_only=True can't unpickle a full model object (it only allows
+    tensors/primitives/OrderedDict, not arbitrary class instances like a
+    pickled torchvision KeypointRCNN) -- False is genuinely required here.
+    SEC-02 mitigates the resulting risk with a pinned-checksum check on the
+    R2-fallback download path for these checkpoints (see R2_CHECKSUM_PINS
+    in worker/app.py) rather than trusting an unauthenticated download.
+    """
     return torch.load(weights_path, map_location=device, weights_only=False)
 
 
@@ -288,7 +296,7 @@ class TrackNetAdapter:
         # ball_track.pt is saved as a state dict, so we instantiate the
         # architecture and load weights manually.
         self._model = _TrackNet()
-        state = torch.load(weights_path, map_location=self.device, weights_only=False)
+        state = torch.load(weights_path, map_location=self.device, weights_only=True)
         self._model.load_state_dict(state)
         self._model.to(self.device).eval()
 

@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import modal
 import os
@@ -5,6 +6,29 @@ import json
 import uuid
 from pathlib import Path
 from fastapi import Header, HTTPException
+
+# SEC-02: court_kpRCNN.pth/net_kpRCNN.pth are loaded as full pickled model
+# objects (torch.load(..., weights_only=False) in court_detector.py), which
+# can't safely be swapped to weights_only=True. Since the R2 fallback path is
+# unauthenticated, pin known-good hashes and verify any R2-downloaded copy
+# before it's ever passed to torch.load. Computed from the current Modal
+# Volume copies via `modal volume get badminton-models <file> - | sha256sum`.
+R2_CHECKSUM_PINS = {
+    "court_kpRCNN.pth": "5b34099870fd694bb996bab5e99559fa26fd3f14178d1d09742dece4682b69af",
+    "net_kpRCNN.pth": "965149ce6eb230e76ae5682acfacbaf52df325327fc115fd2211b5b7204ed2bc",
+}
+
+
+def _verify_checksum(path: Path, expected_sha256: str) -> None:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if actual != expected_sha256:
+        raise ValueError(
+            f"Checksum mismatch for {path.name}: expected {expected_sha256}, got {actual}"
+        )
 
 # 1. Define the Modal App
 app = modal.App("badminton-ai-worker")
@@ -167,6 +191,8 @@ def process_badminton_video(data: dict, authorization: str = Header(default=None
                 print(f"[download] {filename} missing from Volume. Attempting R2 download: models/{filename}")
                 try:
                     s3.download_file(bucket, f"models/{filename}", str(target_path))
+                    if filename in R2_CHECKSUM_PINS:
+                        _verify_checksum(target_path, R2_CHECKSUM_PINS[filename])
                     resolved_paths[key] = str(target_path)
                     print(f"[OK] Successfully recovered {filename} from R2")
                 except Exception as e:
