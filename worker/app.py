@@ -1,7 +1,34 @@
+import hashlib
+import hmac
 import modal
 import os
 import json
+import uuid
 from pathlib import Path
+from fastapi import Header, HTTPException
+
+# SEC-02: court_kpRCNN.pth/net_kpRCNN.pth are loaded as full pickled model
+# objects (torch.load(..., weights_only=False) in court_detector.py), which
+# can't safely be swapped to weights_only=True. Since the R2 fallback path is
+# unauthenticated, pin known-good hashes and verify any R2-downloaded copy
+# before it's ever passed to torch.load. Computed from the current Modal
+# Volume copies via `modal volume get badminton-models <file> - | sha256sum`.
+R2_CHECKSUM_PINS = {
+    "court_kpRCNN.pth": "5b34099870fd694bb996bab5e99559fa26fd3f14178d1d09742dece4682b69af",
+    "net_kpRCNN.pth": "965149ce6eb230e76ae5682acfacbaf52df325327fc115fd2211b5b7204ed2bc",
+}
+
+
+def _verify_checksum(path: Path, expected_sha256: str) -> None:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if actual != expected_sha256:
+        raise ValueError(
+            f"Checksum mismatch for {path.name}: expected {expected_sha256}, got {actual}"
+        )
 
 # 1. Define the Modal App
 app = modal.App("badminton-ai-worker")
@@ -46,6 +73,30 @@ worker_image = (
 models_volume = modal.Volume.from_name("badminton-models", create_if_missing=True)
 MODELS_DIR = Path("/models")
 
+
+def _validate_webhook_secret(authorization: str | None, expected_secret: str | None) -> bool:
+    """Constant-time check of an `Authorization: Bearer <token>` header."""
+    if not authorization or not expected_secret:
+        return False
+    scheme, _, token = authorization.partition(" ")
+    if scheme != "Bearer" or not token:
+        return False
+    return hmac.compare_digest(token, expected_secret)
+
+
+def _validate_video_e2_key(video_e2_key: str, user_id: str) -> bool:
+    """Reject any E2 key not scoped to the requesting user's upload prefix."""
+    return isinstance(video_e2_key, str) and video_e2_key.startswith(f"uploads/{user_id}/")
+
+
+def _validate_video_id(video_id: str) -> bool:
+    """Reject anything that isn't a well-formed UUID (real ids are crypto.randomUUID())."""
+    try:
+        uuid.UUID(video_id)
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False
+
 @app.function(
     image=worker_image,
     volumes={MODELS_DIR: models_volume},
@@ -54,14 +105,22 @@ MODELS_DIR = Path("/models")
     timeout=1200
 )
 @modal.fastapi_endpoint(method="POST")
-def process_badminton_video(data: dict):
+def process_badminton_video(data: dict, authorization: str = Header(default=None)):
     """
     Webhook entrypoint: Receives video details and starts analysis.
     """
+    if not _validate_webhook_secret(authorization, os.environ.get("MODAL_WEBHOOK_SECRET")):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     video_id = data["videoId"]
     user_id = data["userId"]
     video_e2_key = data["videoE2Key"]
-    
+
+    if not _validate_video_id(video_id):
+        raise HTTPException(status_code=400, detail="Malformed videoId")
+    if not _validate_video_e2_key(video_e2_key, user_id):
+        raise HTTPException(status_code=403, detail="videoE2Key does not match the requesting user")
+
     import boto3
     import firebase_admin
     from firebase_admin import credentials, firestore
@@ -132,6 +191,8 @@ def process_badminton_video(data: dict):
                 print(f"[download] {filename} missing from Volume. Attempting R2 download: models/{filename}")
                 try:
                     s3.download_file(bucket, f"models/{filename}", str(target_path))
+                    if filename in R2_CHECKSUM_PINS:
+                        _verify_checksum(target_path, R2_CHECKSUM_PINS[filename])
                     resolved_paths[key] = str(target_path)
                     print(f"[OK] Successfully recovered {filename} from R2")
                 except Exception as e:

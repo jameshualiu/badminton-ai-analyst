@@ -15,7 +15,7 @@ The frontend sends `{ filename, contentType, size }` with a Firebase JWT in the 
 The frontend `PUT`s the raw video file directly to the presigned E2 URL — the backend is never in the upload path. This keeps the Express server lightweight and avoids proxying large files.
 
 **Step 3 — Complete** (`POST /api/videos/:videoId/complete`)
-The frontend notifies the backend that the upload finished. The backend marks the Firestore doc as `queued` and then **fire-and-forgets** a `POST` to `MODAL_WEBHOOK_URL` with `{ videoId, userId, videoE2Key }`. The user gets an instant `{ status: "queued" }` response while the ML worker boots asynchronously.
+The frontend notifies the backend that the upload finished. The backend marks the Firestore doc as `queued` and then **fire-and-forgets** a `POST` to `MODAL_WEBHOOK_URL` with `{ videoId, userId, videoE2Key }`, authenticated with an `Authorization: Bearer <MODAL_WEBHOOK_SECRET>` header. The user gets an instant `{ status: "queued" }` response while the ML worker boots asynchronously.
 
 ### Status polling via Firestore real-time subscription
 
@@ -33,6 +33,8 @@ The worker runs as a Modal `fastapi_endpoint` on an NVIDIA T4 GPU with a 20-minu
 
 **Processing-length constraint (WK-09)**
 There is no artificial frame cap — `process_video()` processes the full video by default. The real constraint on how long a match can be is the Modal function's own 20-minute (`timeout=1200`) wall-clock limit covering download + model loading + the full pipeline + upload; a video that doesn't finish within that window fails the request rather than being silently truncated. If a caller does pass an explicit `limit_frames`, `analysis.json`'s `summary.truncated` is set `true` so the frontend can surface that the result is a partial prefix.
+**Webhook authentication & input validation (SEC-01)**
+Before touching Firestore or S3, the endpoint validates the `Authorization: Bearer <token>` header via a constant-time comparison against `MODAL_WEBHOOK_SECRET` (stored in the Modal secret `badminton-ai-secrets`; the backend sends the matching value from its own `MODAL_WEBHOOK_SECRET` env var) — a missing/mismatched token gets a 401. `videoId` must parse as a UUID (real ids are `crypto.randomUUID()` from the backend) or the request gets a 400, preventing path-traversal via `/tmp/{videoId}...` paths. `videoE2Key` must start with `uploads/{userId}/` or the request gets a 403, preventing one user's request from pulling another user's (or an arbitrary) object out of the bucket.
 
 ### Model loading
 

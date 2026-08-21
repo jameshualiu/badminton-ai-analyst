@@ -198,7 +198,7 @@ class TrackNetV3Adapter:
                  device: Optional[str] = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-        ckpt = torch.load(tracknet_path, map_location=self.device, weights_only=False)
+        ckpt = torch.load(tracknet_path, map_location=self.device, weights_only=True)
         params = ckpt["param_dict"]
         self.seq_len = params["seq_len"]
         bg_mode = params["bg_mode"]
@@ -210,7 +210,7 @@ class TrackNetV3Adapter:
 
         self._inpaintnet = None
         if inpaintnet_path:
-            ckpt_in = torch.load(inpaintnet_path, map_location=self.device, weights_only=False)
+            ckpt_in = torch.load(inpaintnet_path, map_location=self.device, weights_only=True)
             self.inpaint_seq_len = ckpt_in["param_dict"]["seq_len"]
             self._inpaintnet = InpaintNet()
             self._inpaintnet.load_state_dict(ckpt_in["model"])
