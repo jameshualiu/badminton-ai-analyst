@@ -33,6 +33,7 @@ describe('VideoController', () => {
   let app;
   const originalFetch = global.fetch;
   const originalWebhookUrl = process.env.MODAL_WEBHOOK_URL;
+  const originalWebhookSecret = process.env.MODAL_WEBHOOK_SECRET;
   const originalVercel = process.env.VERCEL;
 
   beforeEach(() => {
@@ -46,6 +47,7 @@ describe('VideoController', () => {
     };
     app = buildApp(service);
     process.env.MODAL_WEBHOOK_URL = 'https://modal.example/webhook';
+    process.env.MODAL_WEBHOOK_SECRET = 'test-secret';
     delete process.env.VERCEL;
     waitUntil.mockClear();
   });
@@ -53,6 +55,7 @@ describe('VideoController', () => {
   afterEach(() => {
     global.fetch = originalFetch;
     process.env.MODAL_WEBHOOK_URL = originalWebhookUrl;
+    process.env.MODAL_WEBHOOK_SECRET = originalWebhookSecret;
     if (originalVercel === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = originalVercel;
   });
@@ -104,6 +107,22 @@ describe('VideoController', () => {
         expect.objectContaining({ method: 'POST' })
       );
       resolveFetch({ ok: true });
+    });
+
+    it('sends the shared-secret bearer token on the webhook request', async () => {
+      service.completeUpload.mockResolvedValue({ success: true });
+      service.repo.getVideo.mockResolvedValue({ input: { e2Key: 'uploads/user-1/video-1/a.mp4' } });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true });
+
+      await request(app).post('/video-1/complete').send();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://modal.example/webhook',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer test-secret' })
+        })
+      );
     });
 
     it('marks the video failed when the webhook responds non-OK', async () => {
