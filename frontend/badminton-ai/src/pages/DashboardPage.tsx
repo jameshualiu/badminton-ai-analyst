@@ -133,7 +133,18 @@ export default function DashboardPage() {
 
   const handleUpload = async (file: File): Promise<Result<{ videoId: string }, ApiError>> => {
     if (!user) return { ok: false, error: new ApiError("Not signed in", 401) };
-    const token = await user.getIdToken();
+    let token: string;
+    try {
+      token = await user.getIdToken();
+    } catch (err) {
+      return {
+        ok: false,
+        error: new ApiError(
+          err instanceof Error ? err.message : "Failed to refresh session",
+          401,
+        ),
+      };
+    }
     return createAndUploadVideo(file, token);
   };
 
