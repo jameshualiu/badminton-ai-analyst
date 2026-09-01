@@ -56,7 +56,7 @@ flowchart LR
     B["Browser<br/>React 19 SPA"] -->|"1 · POST /videos/init"| API["Express API"]
     API -->|"presigned PUT URL + videoId"| B
     API -->|"create doc"| FS[("Firestore")]
-    B -->|"2 · PUT video (direct)"| E2[("IDrive E2<br/>S3-compatible")]
+    B -->|"2 · PUT video (direct)"| E2[("Cloudflare R2<br/>S3-compatible")]
     B -->|"3 · POST /complete"| API
     API -->|"mark queued · fire webhook"| W["Modal Worker<br/>T4 GPU"]
     W -->|"pull video"| E2
@@ -97,7 +97,7 @@ Every optional model path degrades gracefully to the next fallback rather than e
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Radix UI, React Router 7, Firebase (Auth + Firestore)
 - **Backend:** Node.js, Express 5, Firebase Admin, `@aws-sdk/client-s3` (presigned URLs), Pino, `express-rate-limit`
 - **Worker:** Python, PyTorch / ONNX Runtime, OpenCV, deployed on Modal (NVIDIA T4)
-- **Storage:** IDrive E2 (S3-compatible object storage)
+- **Storage:** Cloudflare R2 (S3-compatible object storage)
 - **Infra:** Docker, Docker Compose (frontend + backend); Modal (worker)
 
 ---
@@ -109,7 +109,7 @@ Every optional model path degrades gracefully to the next fallback rather than e
 - Node.js 20+
 - Docker Desktop (for the quick start)
 - Python 3.10+ and a [Modal](https://modal.com) account (only if running the worker)
-- A Firebase project (Auth + Firestore) and an S3-compatible bucket (IDrive E2 / Cloudflare R2)
+- A Firebase project (Auth + Firestore) and a Cloudflare R2 bucket
 
 ### Quick start (frontend + backend via Docker)
 

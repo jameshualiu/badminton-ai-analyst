@@ -51,7 +51,7 @@ async function api<T>(path: string, token: string, opts?: RequestInit): Promise<
 
 /**
  * 1. Ask backend to create DB record & generate upload URL
- * 2. Uploads file to IDrive e2 directly
+ * 2. Uploads file to Cloudflare R2 directly
  * 3. Tells backend upload is done
  *
  * Returns a Result — never throws. Callers pattern-match on ok/error.
