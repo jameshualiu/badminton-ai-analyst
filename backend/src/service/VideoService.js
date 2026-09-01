@@ -5,6 +5,10 @@ const r2Client = require('../config/r2');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 
+// BE-11: matches the landing page's advertised "MP4, MOV or AVI · up to 2 GB".
+const ALLOWED_VIDEO_CONTENT_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/x-msvideo']);
+const MAX_UPLOAD_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
+
 class VideoService {
   constructor(videoRepo) {
     this.repo = videoRepo;
@@ -12,17 +16,36 @@ class VideoService {
 
   // Step 1: Generate URL + Create DB Record
   async initializeUpload(userId, fileMeta) {
+    if (!ALLOWED_VIDEO_CONTENT_TYPES.has(fileMeta.contentType)) {
+      throw new AppError(`Unsupported contentType: ${fileMeta.contentType}. Allowed: MP4, MOV, AVI.`, 400);
+    }
+    if (!Number.isFinite(fileMeta.size) || fileMeta.size <= 0) {
+      throw new AppError('size must be a positive number', 400);
+    }
+    if (fileMeta.size > MAX_UPLOAD_SIZE_BYTES) {
+      throw new AppError(`size exceeds the maximum upload size of ${MAX_UPLOAD_SIZE_BYTES} bytes (2GB)`, 400);
+    }
+
     const videoId = randomUUID();
     const e2Key = `uploads/${userId}/${videoId}/${fileMeta.filename}`;
 
-    // A. Generate Presigned PUT URL (valid for 1 hour)
+    // A. Generate Presigned PUT URL (valid for 1 hour). ContentLength is pinned
+    // into the signature (via signableHeaders) so the actual uploaded bytes
+    // can't exceed the validated/declared size -- R2 rejects a PUT whose real
+    // Content-Length doesn't match what was signed. (createPresignedPost's
+    // content-length-range isn't a viable alternative here: R2 doesn't
+    // reliably support presigned POST -- see PR discussion for BE-11.)
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: e2Key,
       ContentType: fileMeta.contentType,
+      ContentLength: fileMeta.size,
     });
-    
-    const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+
+    const uploadUrl = await getSignedUrl(r2Client, command, {
+      expiresIn: 3600,
+      signableHeaders: new Set(['content-length']),
+    });
 
     // B. Create the DB Document immediately
     await this.repo.createVideoDoc(userId, videoId, {
