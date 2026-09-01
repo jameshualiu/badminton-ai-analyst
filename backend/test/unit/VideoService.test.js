@@ -50,11 +50,43 @@ describe('VideoService', () => {
   });
 
   describe('completeUpload', () => {
-    it('marks the video as queued', async () => {
+    it('marks the video as queued when no doc exists yet', async () => {
+      repo.getVideo.mockResolvedValue(null);
+
       const result = await service.completeUpload('user-1', 'video-1');
 
       expect(repo.updateStatus).toHaveBeenCalledWith('user-1', 'video-1', 'queued');
-      expect(result).toEqual({ success: true, videoId: 'video-1' });
+      expect(result).toEqual({ success: true, videoId: 'video-1', alreadyProcessed: false, status: 'queued' });
+    });
+
+    it('marks the video as queued when it is in an uploading state', async () => {
+      repo.getVideo.mockResolvedValue({ status: 'uploading' });
+
+      const result = await service.completeUpload('user-1', 'video-1');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('user-1', 'video-1', 'queued');
+      expect(result.alreadyProcessed).toBe(false);
+    });
+
+    it.each(['queued', 'running', 'done'])(
+      'is a no-op and does not fire a second trigger when already %s',
+      async (status) => {
+        repo.getVideo.mockResolvedValue({ status });
+
+        const result = await service.completeUpload('user-1', 'video-1');
+
+        expect(repo.updateStatus).not.toHaveBeenCalled();
+        expect(result).toEqual({ success: true, videoId: 'video-1', alreadyProcessed: true, status });
+      }
+    );
+
+    it('allows a retry (does not block) when the video previously failed', async () => {
+      repo.getVideo.mockResolvedValue({ status: 'failed' });
+
+      const result = await service.completeUpload('user-1', 'video-1');
+
+      expect(repo.updateStatus).toHaveBeenCalledWith('user-1', 'video-1', 'queued');
+      expect(result.alreadyProcessed).toBe(false);
     });
   });
 

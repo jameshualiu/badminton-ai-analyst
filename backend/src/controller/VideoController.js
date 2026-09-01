@@ -30,8 +30,13 @@ class VideoController {
       return next(new AppError('Video ID is required', 400));
     }
 
-    // 1. Mark as queued in DB
-    await this.service.completeUpload(userId, videoId);
+    // 1. Mark as queued in DB (idempotent -- no-ops if already queued/running/done)
+    const { alreadyProcessed, status } = await this.service.completeUpload(userId, videoId);
+
+    if (alreadyProcessed) {
+      logger.info({ videoId, status }, "Ignoring duplicate /complete call; video already processed");
+      return res.json({ status });
+    }
 
     // 2. Trigger Modal AI Worker (Asynchronously)
     // We get the video record first to get the E2 key
