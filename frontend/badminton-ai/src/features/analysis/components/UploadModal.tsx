@@ -21,6 +21,16 @@ interface UploadModalProps {
 
 type UploadState = "idle" | "uploading" | "complete" | "error";
 
+// FE-07: matches BE-11's server-side allowlist/cap (MP4, MOV, AVI · up to 2 GB).
+const ALLOWED_VIDEO_MIME_TYPES = new Set(["video/mp4", "video/quicktime", "video/x-msvideo"]);
+const ALLOWED_VIDEO_EXTENSIONS = [".mp4", ".mov", ".avi"];
+const MAX_UPLOAD_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
+
+function hasAllowedExtension(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  return ALLOWED_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysis }: UploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +39,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadedVideoId, setUploadedVideoId] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -38,6 +49,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
         setUploadProgress(0);
         setUploadedVideoId("");
         setErrorMessage(null);
+        setFileError(null);
       }, 300);
     }
   }, [open]);
@@ -76,7 +88,16 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
   };
 
   const handleFile = (file: File) => {
-    if (file.type.startsWith("video/")) setSelectedFile(file);
+    if (!hasAllowedExtension(file.name) || (file.type && !ALLOWED_VIDEO_MIME_TYPES.has(file.type))) {
+      setFileError("Unsupported file type. Please upload an MP4, MOV, or AVI video.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      setFileError(`File is too large (${(file.size / 1024 ** 3).toFixed(2)} GB). Maximum size is 2 GB.`);
+      return;
+    }
+    setFileError(null);
+    setSelectedFile(file);
   };
 
   const handleUploadClick = async () => {
@@ -115,6 +136,7 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
 
           {/* ── Idle: no file selected ── */}
           {uploadState === "idle" && !selectedFile && (
+            <>
             <div
               className={`group relative flex flex-col items-center justify-center w-full h-72 border-2 border-dashed rounded-2xl transition-all duration-200 cursor-pointer outline-none ${
                 dragActive
@@ -129,7 +151,13 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
               role="button"
               tabIndex={0}
             >
-              <input ref={inputRef} type="file" className="hidden" accept="video/*" onChange={handleChange} />
+              <input
+                ref={inputRef}
+                type="file"
+                className="hidden"
+                accept="video/mp4,video/quicktime,video/x-msvideo,.mp4,.mov,.avi"
+                onChange={handleChange}
+              />
               <div className="flex flex-col items-center gap-4 text-center">
                 <div className={`p-4 rounded-2xl border transition-all duration-200 ${
                   dragActive
@@ -153,6 +181,13 @@ export function UploadModal({ open, onOpenChange, userId, onUpload, onSeeAnalysi
                 </div>
               </div>
             </div>
+            {fileError && (
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {fileError}
+              </p>
+            )}
+            </>
           )}
 
           {/* ── Idle: file selected ── */}
