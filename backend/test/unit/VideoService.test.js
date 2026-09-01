@@ -47,6 +47,58 @@ describe('VideoService', () => {
       expect(result.uploadUrl).toBe('https://r2.example/put-url');
       expect(result.e2Key).toBe(data.input.e2Key);
     });
+
+    it('pins ContentLength into the signature so actual uploaded bytes cannot exceed the declared size', async () => {
+      getSignedUrl.mockResolvedValue('https://r2.example/put-url');
+
+      await service.initializeUpload('user-1', {
+        filename: 'match.mp4',
+        contentType: 'video/mp4',
+        size: 12345,
+      });
+
+      const [, command, options] = getSignedUrl.mock.calls[0];
+      expect(command.input.ContentLength).toBe(12345);
+      expect(options.signableHeaders).toEqual(new Set(['content-length']));
+    });
+
+    it.each(['video/quicktime', 'video/x-msvideo'])(
+      'accepts %s as an allowed content type',
+      async (contentType) => {
+        getSignedUrl.mockResolvedValue('https://r2.example/put-url');
+
+        await expect(
+          service.initializeUpload('user-1', { filename: 'match.mov', contentType, size: 100 })
+        ).resolves.toBeDefined();
+      }
+    );
+
+    it('rejects a disallowed contentType', async () => {
+      await expect(
+        service.initializeUpload('user-1', { filename: 'match.png', contentType: 'image/png', size: 100 })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(repo.createVideoDoc).not.toHaveBeenCalled();
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['negative', -1],
+      ['zero', 0],
+      ['non-numeric', NaN],
+      ['over the 2GB max', 2 * 1024 * 1024 * 1024 + 1],
+    ])('rejects a %s size', async (_label, size) => {
+      await expect(
+        service.initializeUpload('user-1', { filename: 'match.mp4', contentType: 'video/mp4', size })
+      ).rejects.toMatchObject({ statusCode: 400 });
+      expect(repo.createVideoDoc).not.toHaveBeenCalled();
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('rejects with an AppError instance', async () => {
+      await expect(
+        service.initializeUpload('user-1', { filename: 'match.png', contentType: 'image/png', size: 100 })
+      ).rejects.toBeInstanceOf(AppError);
+    });
   });
 
   describe('completeUpload', () => {
