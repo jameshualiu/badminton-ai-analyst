@@ -9,7 +9,7 @@
 The user opens the `UploadModal`, selects a video file, and the `createAndUploadVideo()` function in `videoService.ts` orchestrates a three-step handshake:
 
 **Step 1 — Init** (`POST /api/videos/init`)
-The frontend sends `{ filename, contentType, size }` with a Firebase JWT in the `Authorization` header. The Express backend's `authMiddleware` verifies the token, then `VideoService.initializeUpload()` does two things atomically: it generates a presigned `PUT` URL (valid 1 hour) pointing directly at IDrive E2 (Cloudflare R2-compatible), and creates a Firestore document at `users/{uid}/videos/{videoId}` with status `uploading`. The presigned URL and `videoId` are returned to the frontend.
+The frontend sends `{ filename, contentType, size }` with a Firebase JWT in the `Authorization` header. The Express backend's `authMiddleware` verifies the token, then `VideoService.initializeUpload()` does two things atomically: it generates a presigned `PUT` URL (valid 1 hour) pointing directly at Cloudflare R2, and creates a Firestore document at `users/{uid}/videos/{videoId}` with status `uploading`. The presigned URL and `videoId` are returned to the frontend.
 
 **Step 2 — Direct upload to storage**
 The frontend `PUT`s the raw video file directly to the presigned E2 URL — the backend is never in the upload path. This keeps the Express server lightweight and avoids proxying large files.
@@ -163,7 +163,7 @@ The `AnalysisData` interface mirrors the JSON payload exactly. `DashboardVideoCa
 The app's architecture is shaped by the research insight from VIRD (Lin et al., IEEE TVCG 2024) that coaches want *actionable, stroke-level* feedback rather than raw video. Every layer of the system is designed to progressively distill raw video into meaningful metrics.
 
 **Raw video → E2 storage**
-The user uploads an MP4 from the browser. The file travels directly from the browser to IDrive E2 via a presigned URL — never touching the Express server. The Firestore document is the single source of truth for job state throughout.
+The user uploads an MP4 from the browser. The file travels directly from the browser to Cloudflare R2 via a presigned URL — never touching the Express server. The Firestore document is the single source of truth for job state throughout.
 
 **E2 → Modal worker → analysis.json**
 The worker downloads the video to `/tmp`, runs the full pipeline, and writes `analysis.json` back to E2 under `outputs/`. The Firestore doc is updated at key milestones (`running` on start, `done` or `failed` on finish), which the frontend reflects in real time.
@@ -195,7 +195,7 @@ Browser (React/TS)
   │                                        │
   │  ◄── { videoId, uploadUrl } ───────────┤
   │                                        │ creates Firestore doc
-  ├─ PUT video ──────────────────────► IDrive E2 (R2)
+  ├─ PUT video ──────────────────────► Cloudflare R2
   │
   ├─ POST /api/videos/:id/complete ──► Express backend
   │                                        │ marks "queued"
@@ -216,7 +216,7 @@ Browser (React/TS)
   ├─ GET /api/videos/:id/results ────► Express backend
   │  ◄── { status, urls: { analysisJson } }
   │
-  ├─ GET analysis.json ──────────────► IDrive E2
+  ├─ GET analysis.json ──────────────► Cloudflare R2
   │  ◄── AnalysisData payload
   │
   └─ Renders ShotHeatmap + LiveTracker from AnalysisData
