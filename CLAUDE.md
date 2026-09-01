@@ -34,7 +34,7 @@ pip install -r requirements.txt
 pytest worker/tests/                        # run all tests
 pytest worker/tests/test_shuttle_in_court.py -v   # single file
 ```
-Worker tests deliberately **reimplement** small pieces of `pipeline.py` logic locally instead of importing the module, because importing `pipeline.py`/`inference.py` pulls in torch/onnxruntime/decord and requires real model weights. When you change geometry/hit-detection logic in `pipeline.py`, update the mirrored copy in the corresponding test file too — search `worker/tests/` for the function name to find it.
+Worker tests deliberately **reimplement** small pieces of `pipeline.py` logic locally instead of importing the module, because importing `pipeline.py`/`inference.py` pulls in torch/onnxruntime/decord and requires real model weights. When you change geometry/hit-detection logic in `pipeline.py`, update the mirrored copy in the corresponding test file too — search `worker/tests/` for the function name to find it. Do not attempt to refactor these tests into standard imports.
 
 ### Full stack (Docker)
 ```bash
@@ -75,3 +75,34 @@ Active UI theme is blue-black (`theme-ai-saas` dark), primary `#3B82F6` — not 
 ## Working across the stack
 
 Because the frontend, backend, and worker communicate only through Firestore documents and `analysis.json` in E2 — never direct calls — changes to either data shape must be kept in sync across three places: `worker/pipeline.py`'s return dict, the frontend's `AnalysisData` type (`src/features/analysis/types.ts`), and the Firestore schema fields the backend/worker write to. `data-flow.md` documents the current shape of both; update it when the shape changes.
+
+All git commits made to this codebase must adhere strictly to the Conventional Commits specification (e.g., `feat(worker): ...`, `fix(backend): ...`).
+
+## Agent Protocol Instructions
+
+When requested to run the backlog automation protocol, execute the following multi-step pipeline for the target tickets in `backlog.md` starting with Tier 1. You are permitted to execute file-reads, file-writes, local tests, and terminal/git commands autonomously, but you must halt and wait for user input at the specified `[GATE]` markers.
+
+### Conflict Prevention Pre-Check
+Before detailing a plan for the active ticket, inspect its target file modifications. Cross-reference those files against the target files of the next 3 downstream tickets in `backlog.md`. If an overlap is detected, explicitly report it to the user with a recommended merging or execution strategy before proceeding.
+
+### Pipeline Steps
+
+#### Step 1: Context Gathering & Plan Proposal
+1. Select the highest-priority, incomplete ticket from Tier 1 (ignore open PR tasks like `[WK-19]`).
+2. Run the Conflict Prevention Pre-Check.
+3. Dynamically open, read, and analyze the listed target source code files.
+4. Output a concise engineering strategy outlining exactly what code/logic will change to meet the ticket's Acceptance Criteria.
+5. **[GATE 1]**: Completely halt execution and wait for the user to say "Proceed".
+
+#### Step 2: Branch Creation & Implementation
+1. Create and switch to a new git branch: `feature/[Ticket-ID]-[short-kebab-case-description]`.
+2. Implement the code modifications across the codebase.
+3. Run the specific local test suites (e.g., `pytest` for worker modifications) to verify compliance.
+4. Do NOT execute any git commits yet. Instead, display a bulleted list of proposed atomic commits using the Conventional Commits specification. Include file paths underneath each message.
+5. **[GATE 2]**: Completely halt execution and wait for the user to say "Commit these changes".
+
+#### Step 3: Git Operations & PR Creation
+1. Verify `git status` to ensure all changes are accounted for cleanly.
+2. Commit the modifications locally with the approved conventional commit structures.
+3. Run `git push origin HEAD` to push the feature branch to GitHub.
+4. Use the GitHub CLI tool (`gh pr create`) to open a brand-new Pull Request. Title the PR using your primary conventional commit message. Draft a professional, clear 2-sentence description summarizing the structural alterations for an engineering reviewer.
