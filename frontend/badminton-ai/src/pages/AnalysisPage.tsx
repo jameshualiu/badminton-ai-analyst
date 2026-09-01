@@ -101,7 +101,7 @@ export default function AnalysisPage() {
       if (!ctx) return;
       const w = canvas.width, h = canvas.height;
       ctx.clearRect(0, 0, w, h);
-      if (!analysisData) return;
+      if (!analysisData?.summary) return;
 
       const res = analysisData.summary.resolution;
       const sx = w / res[0], sy = h / res[1];
@@ -224,7 +224,7 @@ export default function AnalysisPage() {
   }, [analysisData]);
 
   const fps = useMemo(() => {
-    if (!analysisData) return 30;
+    if (!analysisData?.summary) return 30;
     const dur = analysisData.summary.durationSec;
     const maxFrame = Math.max(
       ...(analysisData.shuttle_debug?.map((s) => s.frame) ?? [0]),
@@ -275,7 +275,7 @@ export default function AnalysisPage() {
                 </div>
               )}
             </div>
-            {analysisData?.summary.truncated && (
+            {analysisData?.summary?.truncated && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 shrink-0">
                 Truncated — showing a partial result
               </span>

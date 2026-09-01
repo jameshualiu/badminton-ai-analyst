@@ -32,7 +32,9 @@ export interface TrackingFrame {
 }
 
 export interface AnalysisData {
-    summary: {
+    // Optional: the worker's ML output is best-effort and a malformed/partial
+    // payload can omit this entirely. Every consumer must guard it (FE-09).
+    summary?: {
         durationSec: number;
         totalShots: number;
         shotCounts: Record<string, number>;
