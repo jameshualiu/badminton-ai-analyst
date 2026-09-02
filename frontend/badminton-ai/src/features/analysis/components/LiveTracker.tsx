@@ -73,7 +73,7 @@ export default function LiveTracker({ analysisData, store }: Props) {
   }, []);
 
   const fps = useMemo(() => {
-    if (!analysisData) return 30;
+    if (!analysisData?.summary) return 30;
     const dur = analysisData.summary.durationSec;
     const maxFrame = Math.max(
       ...(analysisData.shuttle_debug?.map((s) => s.frame) ?? [0]),
