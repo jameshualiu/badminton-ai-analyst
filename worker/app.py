@@ -97,72 +97,41 @@ def _validate_video_id(video_id: str) -> bool:
     except (ValueError, AttributeError, TypeError):
         return False
 
-@app.function(
+
+# WK-10: model loading (reading weight files, pushing them onto the GPU) is
+# expensive and request-independent, so it lives in @modal.enter() -- it runs
+# once when a container starts, not on every request. A warm container
+# reusing an existing self.inference skips straight to processing instead of
+# re-loading every model from scratch.
+@app.cls(
     image=worker_image,
     volumes={MODELS_DIR: models_volume},
     secrets=[modal.Secret.from_name("badminton-ai-secrets")],
     gpu="T4",
     timeout=1200
 )
-@modal.fastapi_endpoint(method="POST")
-def process_badminton_video(data: dict, authorization: str = Header(default=None)):
-    """
-    Webhook entrypoint: Receives video details and starts analysis.
-    """
-    if not _validate_webhook_secret(authorization, os.environ.get("MODAL_WEBHOOK_SECRET")):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+class BadmintonWorker:
+    @modal.enter()
+    def load_models(self):
+        import boto3
+        from inference import BadmintonInference
 
-    video_id = data["videoId"]
-    user_id = data["userId"]
-    video_e2_key = data["videoE2Key"]
+        self.s3 = boto3.client(
+            's3',
+            endpoint_url=os.environ["R2_ENDPOINT"],
+            region_name='auto',
+            aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+            aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"]
+        )
+        self.bucket = os.environ["R2_BUCKET_NAME"]
 
-    if not _validate_video_id(video_id):
-        raise HTTPException(status_code=400, detail="Malformed videoId")
-    if not _validate_video_e2_key(video_e2_key, user_id):
-        raise HTTPException(status_code=403, detail="videoE2Key does not match the requesting user")
-
-    import boto3
-    import firebase_admin
-    from firebase_admin import credentials, firestore
-    
-    from inference import BadmintonInference
-    from pipeline import BadmintonPipeline
-
-    # --- R2 Config ---
-    s3 = boto3.client(
-        's3',
-        endpoint_url=os.environ["R2_ENDPOINT"],
-        region_name='auto',
-        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"]
-    )
-    bucket = os.environ["R2_BUCKET_NAME"]
-    
-    # --- Firebase Setup ---
-    fb_cred = {
-        "type": "service_account",
-        "project_id": os.environ["FIREBASE_PROJECT_ID"],
-        "private_key": os.environ["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
-        "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
-        "token_uri": "https://oauth2.googleapis.com/token",
-    }
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(fb_cred)
-        firebase_admin.initialize_app(cred)
-    db = firestore.client()
-    
-    video_doc_ref = db.collection("users").document(user_id).collection("videos").document(video_id)
-    
-    try:
-        # Step 1: Status Update & Volume Check
-        video_doc_ref.update({"status": "running"})
         print(f"[debug] Diagnostic: Scanning Volume at {MODELS_DIR}")
-        
+
         # Build a map of what's actually in the volume (recursively)
         all_volume_files = {f.name: f for f in MODELS_DIR.glob("**/*") if f.is_file()}
         print(f"[volume] Volume contains: {list(all_volume_files.keys())}")
 
-        # Step 2: Resolve Model Paths (Smart Search)
+        # Resolve Model Paths (Smart Search)
         model_targets = {
             "tracknet": "ball_track.pt",
             "court_kprcnn": "court_kpRCNN.pth",
@@ -190,7 +159,7 @@ def process_badminton_video(data: dict, authorization: str = Header(default=None
                 target_path = MODELS_DIR / filename
                 print(f"[download] {filename} missing from Volume. Attempting R2 download: models/{filename}")
                 try:
-                    s3.download_file(bucket, f"models/{filename}", str(target_path))
+                    self.s3.download_file(self.bucket, f"models/{filename}", str(target_path))
                     if filename in R2_CHECKSUM_PINS:
                         _verify_checksum(target_path, R2_CHECKSUM_PINS[filename])
                     resolved_paths[key] = str(target_path)
@@ -200,55 +169,13 @@ def process_badminton_video(data: dict, authorization: str = Header(default=None
                         resolved_paths[key] = None
                         print(f"[WARN] Optional model '{filename}' not found in Volume or R2; continuing without it")
                     else:
-                        print(f"[ERROR] 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{bucket}' path 'models/{filename}'")
+                        print(f"[ERROR] 404 ERROR: '{filename}' not found in Volume OR R2 bucket '{self.bucket}' path 'models/{filename}'")
                         raise e
 
         models_volume.commit()
 
-        # Step 3: Download Raw Video
-        local_video = f"/tmp/{video_id}.mp4"
-        print(f"[video] Downloading video: {video_e2_key} from {bucket}")
-        try:
-            s3.download_file(bucket, video_e2_key, local_video)
-        except Exception as e:
-            print(f"[ERROR] Video Download Error: {e}")
-            raise e
-        
-        # Step 3.5: Extract thumbnail
-        thumbnail_url = None
-        try:
-            from decord import VideoReader, cpu
-            import cv2
-            import numpy as np
-
-            vr = VideoReader(local_video, ctx=cpu(0), width=640, height=360)
-            fps = vr.get_avg_fps() or 25  # 25 fps assumed if video reports 0 (malformed/fallback)
-            target_frame = min(int(fps * 5), len(vr) - 1)
-            frame_rgb = vr[target_frame].asnumpy()
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-            ok, buf = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if ok:
-                thumb_key = f"outputs/{user_id}/{video_id}/thumbnail.jpg"
-                s3.put_object(
-                    Bucket=bucket,
-                    Key=thumb_key,
-                    Body=buf.tobytes(),
-                    ContentType='image/jpeg',
-                )
-                thumbnail_url = s3.generate_presigned_url(
-                    'get_object',
-                    Params={'Bucket': bucket, 'Key': thumb_key},
-                    ExpiresIn=604800,  # 7 days
-                )
-                print(f"[thumb] Thumbnail uploaded: {thumb_key}")
-            else:
-                print("[thumb] WARNING: cv2.imencode failed, skipping thumbnail")
-        except Exception as e:
-            print(f"[thumb] WARNING: Thumbnail extraction failed (non-fatal): {e}")
-
-        # Step 4: Run Analysis Pipeline
         print("[init] Initializing AI Engine...")
-        inference = BadmintonInference(
+        self.inference = BadmintonInference(
             resolved_paths["tracknet"],
             resolved_paths["court_kprcnn"],
             resolved_paths["net_kprcnn"],
@@ -259,36 +186,135 @@ def process_badminton_video(data: dict, authorization: str = Header(default=None
             hit_detector_path=resolved_paths.get("hit_detector"),
             bst_path=resolved_paths.get("bst"),
         )
-        pipeline = BadmintonPipeline(inference)
-        # No frame cap (WK-09): the real constraint on processing length is
-        # this function's own timeout=1200 (20 min) above, not an arbitrary
-        # frame count.
-        results = pipeline.process_video(local_video)
-        
-        # Step 5: Save analysis.json and Upload back to E2
-        results_local = f"/tmp/{video_id}_analysis.json"
-        with open(results_local, 'w') as f:
-            json.dump(results, f)
-            
-        results_e2_key = f"outputs/{user_id}/{video_id}/analysis.json"
-        s3.upload_file(results_local, bucket, results_e2_key)
-        
-        # Step 6: Finalize Database Record (Lean Schema)
-        video_doc_ref.update({
-            "status": "done",
-            "duration": results["summary"]["durationSec"],
-            "totalShots": results["summary"]["totalShots"],
-            "analysisJson": results_e2_key,
-            "thumbnailUrl": thumbnail_url,
-            "updatedAt": firestore.SERVER_TIMESTAMP
-        })
-        print(f"[done] Processing Complete for {video_id}!")
-        
-    except Exception as e:
-        print(f"[ERROR] Error: {e}")
-        video_doc_ref.update({"status": "failed", "error": str(e)})
-        raise e
+
+    @modal.fastapi_endpoint(method="POST")
+    def process_badminton_video(self, data: dict, authorization: str = Header(default=None)):
+        """
+        Webhook entrypoint: Receives video details and starts analysis.
+        """
+        if not _validate_webhook_secret(authorization, os.environ.get("MODAL_WEBHOOK_SECRET")):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        video_id = data["videoId"]
+        user_id = data["userId"]
+        video_e2_key = data["videoE2Key"]
+
+        if not _validate_video_id(video_id):
+            raise HTTPException(status_code=400, detail="Malformed videoId")
+        if not _validate_video_e2_key(video_e2_key, user_id):
+            raise HTTPException(status_code=403, detail="videoE2Key does not match the requesting user")
+
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+
+        from pipeline import BadmintonPipeline
+
+        s3 = self.s3
+        bucket = self.bucket
+
+        # --- Firebase Setup ---
+        fb_cred = {
+            "type": "service_account",
+            "project_id": os.environ["FIREBASE_PROJECT_ID"],
+            "private_key": os.environ["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
+            "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(fb_cred)
+            firebase_admin.initialize_app(cred)
+        db = firestore.client()
+
+        video_doc_ref = db.collection("users").document(user_id).collection("videos").document(video_id)
+
+        try:
+            # Step 1: Status Update
+            video_doc_ref.update({"status": "running"})
+
+            # Step 2: Download Raw Video
+            local_video = f"/tmp/{video_id}.mp4"
+            print(f"[video] Downloading video: {video_e2_key} from {bucket}")
+            try:
+                s3.download_file(bucket, video_e2_key, local_video)
+            except Exception as e:
+                print(f"[ERROR] Video Download Error: {e}")
+                raise e
+
+            # Step 2.5: Extract thumbnail
+            thumbnail_url = None
+            try:
+                from decord import VideoReader, cpu
+                import cv2
+                import numpy as np
+
+                vr = VideoReader(local_video, ctx=cpu(0), width=640, height=360)
+                fps = vr.get_avg_fps() or 25  # 25 fps assumed if video reports 0 (malformed/fallback)
+                target_frame = min(int(fps * 5), len(vr) - 1)
+                frame_rgb = vr[target_frame].asnumpy()
+                frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                ok, buf = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if ok:
+                    thumb_key = f"outputs/{user_id}/{video_id}/thumbnail.jpg"
+                    s3.put_object(
+                        Bucket=bucket,
+                        Key=thumb_key,
+                        Body=buf.tobytes(),
+                        ContentType='image/jpeg',
+                    )
+                    thumbnail_url = s3.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': bucket, 'Key': thumb_key},
+                        ExpiresIn=604800,  # 7 days
+                    )
+                    print(f"[thumb] Thumbnail uploaded: {thumb_key}")
+                else:
+                    print("[thumb] WARNING: cv2.imencode failed, skipping thumbnail")
+            except Exception as e:
+                print(f"[thumb] WARNING: Thumbnail extraction failed (non-fatal): {e}")
+
+            # Step 3: Run Analysis Pipeline. A fresh BadmintonPipeline is built
+            # per request (cheap -- no I/O) rather than cached like self.inference,
+            # since it holds per-video mutable state (geometry/homography_matrix
+            # from setup_homography()) that must never carry over between requests.
+            pipeline = BadmintonPipeline(self.inference)
+            # No frame cap (WK-09): the real constraint on processing length is
+            # this function's own timeout=1200 (20 min) above, not an arbitrary
+            # frame count.
+            results = pipeline.process_video(local_video)
+
+            # Step 4: Save analysis.json and Upload back to E2
+            results_local = f"/tmp/{video_id}_analysis.json"
+            with open(results_local, 'w') as f:
+                json.dump(results, f)
+
+            results_e2_key = f"outputs/{user_id}/{video_id}/analysis.json"
+            s3.upload_file(results_local, bucket, results_e2_key)
+
+            # Step 5: Finalize Database Record (Lean Schema)
+            video_doc_ref.update({
+                "status": "done",
+                "duration": results["summary"]["durationSec"],
+                "totalShots": results["summary"]["totalShots"],
+                "analysisJson": results_e2_key,
+                "thumbnailUrl": thumbnail_url,
+                "updatedAt": firestore.SERVER_TIMESTAMP
+            })
+            print(f"[done] Processing Complete for {video_id}!")
+
+        except Exception as e:
+            print(f"[ERROR] Error: {e}")
+            video_doc_ref.update({"status": "failed", "error": str(e)})
+            raise e
+
 
 @app.local_entrypoint()
 def main(video_id: str, user_id: str, video_e2_key: str):
-    process_badminton_video.remote(video_id, user_id, video_e2_key)
+    # Pre-existing bug fixed in passing: this called .remote(video_id, user_id,
+    # video_e2_key) as 3 positional args against a function that only ever took
+    # a single `data: dict` -- already broken before this refactor. Building the
+    # dict here matches the real signature, though note the endpoint's auth
+    # check (SEC-01) will still reject this without a valid Authorization
+    # header, which this local entrypoint doesn't supply.
+    BadmintonWorker().process_badminton_video.remote(
+        {"videoId": video_id, "userId": user_id, "videoE2Key": video_e2_key}
+    )
